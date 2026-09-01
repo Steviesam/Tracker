@@ -1,0 +1,48 @@
+{
+  "name": "social-metrics-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Upload an Excel/CSV, auto-detect social media video/reel URLs, fetch available metrics via official APIs.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && prisma migrate deploy && next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:up": "docker compose up -d",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "6.10.1",
+    "bcryptjs": "2.4.3",
+    "exceljs": "4.4.0",
+    "next": "15.5.23",
+    "prisma": "6.10.1",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "zod": "3.25.67"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "3.3.1",
+    "@types/bcryptjs": "2.4.6",
+    "@types/node": "22.15.32",
+    "@types/react": "19.1.8",
+    "@types/react-dom": "19.1.6",
+    "autoprefixer": "10.4.21",
+    "eslint": "9.29.0",
+    "eslint-config-next": "15.5.23",
+    "postcss": "8.5.26",
+    "tailwindcss": "3.4.17",
+    "typescript": "5.8.3",
+    "vitest": "3.2.7"
+  },
+  "overrides": {
+    "sharp": "^0.35.0",
+    "uuid": "^11.1.1",
+    "postcss": "$postcss"
+  }
+}

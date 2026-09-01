@@ -1,0 +1,8 @@
+Campaign Note,Creator,Content Link,Extra Notes
+Launch week,nasa,https://www.instagram.com/nasa/reel/ABC123xyz9/,posted Monday
+Launch week,Creator A,https://youtu.be/dQw4w9WgXcQ,
+Launch week,,https://www.youtube.com/shorts/dQw4w9WgXcQ,duplicate of the row above
+Retargeting,natgeo,see https://www.instagram.com/natgeo/p/DEF456uvw8/ for the post,two links in one cell https://www.facebook.com/reel/123456789012345
+Retargeting,Creator D,instagram.com/reel/GHI789rst7/,no scheme and no handle
+Ignored,Creator E,https://twitter.com/someone/status/1234567890,unsupported platform
+Ignored,Creator F,https://www.instagram.com/creator_f/,profile page not a post

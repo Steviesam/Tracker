@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  /// Always stored lowercase and trimmed so lookups are unambiguous.
+  email        String   @unique
+  name         String
+  /// bcrypt hash. The plaintext password is never stored or logged.
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  lastLoginAt  DateTime?
+
+  @@index([email])
+}
+
+/**
+ * One Instagram creator in the discovery directory.
+ *
+ * This is a directory the team maintains by uploading a sheet, not scraped data. Instagram
+ * exposes no structured state, city or niche for an account, so those three can only come
+ * from a source that already knows them.
+ *
+ * Every field except the username is nullable: a row with a handle and a city is still
+ * worth keeping, and a filter simply will not match it on the fields it lacks.
+ */
+model Creator {
+  id String @id @default(cuid())
+
+  /// Lowercased, no leading "@". The natural key, so re-uploading a sheet updates in place.
+  username    String  @unique
+  displayName String?
+
+  state String?
+  city  String?
+
+  /// Categories as tags, because sheets write them run-on: `Fashion/lifestyle/ugc` is one
+  /// creator in three categories, and each should find them.
+  niches String[]
+
+  followers Int?
+
+  /// Free-text extras from the sheet that do not map to a column, kept so nothing is lost.
+  notes String?
+
+  /// Filename of the upload this row last came from, so a bad import can be traced back.
+  sourceFile String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Discovery filters on these, and sorts by followers.
+  @@index([state])
+  @@index([city])
+  @@index([followers])
+  @@index([state, city])
+  /// Array containment needs GIN; a b-tree cannot answer "has this tag".
+  @@index([niches], type: Gin)
+}
+
+/**
+ * One login's Metrics and Engagement work: the uploaded/pasted links, their fetched
+ * numbers, and any creator averages already looked up.
+ *
+ * Held in Postgres rather than process memory because a Vercel deploy is many short-lived
+ * instances that do not share a Map. Refresh keeps this row; logout deletes it. The
+ * creator directory above is a different thing — it is the team's dataset and outlives
+ * any one login.
+ */
+model WorkSession {
+  /// Matches the `sid` in the signed cookie.
+  sid String @id
+
+  payload Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([updatedAt])
+}
