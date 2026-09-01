@@ -47,7 +47,13 @@ export async function POST(request: Request) {
         { status: 409 },
       );
     }
-    return NextResponse.json({ error: "Could not create the account." }, { status: 500 });
+    // Anything else is the deployment, not the input: an unreachable database, or tables
+    // that were never migrated.
+    console.error("Signup failed", error);
+    return NextResponse.json(
+      { error: "Sign-up is unavailable — this deployment is misconfigured. Open /api/health." },
+      { status: 503 },
+    );
   }
 
   const response = NextResponse.json({ ok: true });

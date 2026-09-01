@@ -30,25 +30,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Enter a valid email and password." }, { status: 400 });
   }
 
-  const user = await prisma.user.findUnique({
-    where: { email: input.email },
-    select: { id: true, email: true, name: true, passwordHash: true },
-  });
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email: input.email },
+      select: { id: true, email: true, name: true, passwordHash: true },
+    });
 
-  const passwordMatches = await compare(input.password, user?.passwordHash ?? DUMMY_HASH);
+    const passwordMatches = await compare(input.password, user?.passwordHash ?? DUMMY_HASH);
 
-  // One generic message for both cases so the response cannot be used to enumerate accounts.
-  if (!user || !passwordMatches) {
-    return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
+    // One generic message for both cases so the response cannot be used to enumerate accounts.
+    if (!user || !passwordMatches) {
+      return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
+    }
+
+    await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+
+    const response = NextResponse.json({ ok: true });
+    response.cookies.set(
+      SESSION_COOKIE,
+      await createSessionToken({ id: user.id, email: user.email, name: user.name }),
+      sessionCookieOptions(),
+    );
+    return response;
+  } catch (error) {
+    // An unreachable database or a missing signing secret would otherwise throw an HTML
+    // error page, which the form can only report as a bare "Sign in failed".
+    console.error("Sign-in failed", error);
+    return NextResponse.json(
+      { error: "Sign-in is unavailable — this deployment is misconfigured. Open /api/health." },
+      { status: 503 },
+    );
   }
-
-  await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
-
-  const response = NextResponse.json({ ok: true });
-  response.cookies.set(
-    SESSION_COOKIE,
-    await createSessionToken({ id: user.id, email: user.email, name: user.name }),
-    sessionCookieOptions(),
-  );
-  return response;
 }
