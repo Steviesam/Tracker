@@ -6,6 +6,25 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
+ * Reported by name only. "liveFollowers: false" cannot say which of four variables is the
+ * missing one, leaving no way to find out except guessing and redeploying.
+ */
+const OPTIONAL_VARS = [
+  "YOUTUBE_API_KEY",
+  "APIFY_TOKEN",
+  "APIFY_INSTAGRAM_ACTOR",
+  "APIFY_FACEBOOK_ACTOR",
+  "APIFY_INSTAGRAM_REELS_ACTOR",
+  "APIFY_INSTAGRAM_PROFILE_ACTOR",
+] as const;
+
+function presence(): Record<string, boolean> {
+  return Object.fromEntries(
+    OPTIONAL_VARS.map((name) => [name, Boolean(process.env[name]?.trim())]),
+  );
+}
+
+/**
  * Whether this deployment is actually usable.
  *
  * A missing environment variable surfaces in the browser only as "Sign in failed", with the
@@ -64,5 +83,8 @@ export async function GET() {
   }
 
   const ok = problems.length === 0;
-  return NextResponse.json({ ok, config, database, problems }, { status: ok ? 200 : 503 });
+  return NextResponse.json(
+    { ok, config, env: presence(), database, problems },
+    { status: ok ? 200 : 503 },
+  );
 }
