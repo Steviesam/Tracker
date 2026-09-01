@@ -33,6 +33,34 @@ const SORT_LABEL: Record<SortKey, string> = {
   city: "By city",
 };
 
+/** Serverless hosts cap a request body; Vercel's is 4.5 MB and cannot be raised. */
+const REQUEST_BODY_LIMIT = 4.5 * 1024 * 1024;
+
+/**
+ * Names the likely cause when the server could not say so itself.
+ *
+ * A rejected upload is the one failure the user can actually act on — split the sheet —
+ * but only if told. "Could not import that file" sent people looking at the file's
+ * contents instead of its size.
+ */
+function importFailure(status: number, size: number): string {
+  if (status === 413 || size > REQUEST_BODY_LIMIT) {
+    return (
+      `That file is ${(size / 1024 / 1024).toFixed(1)} MB. A single upload cannot exceed ` +
+      "4.5 MB on this host, so it was rejected before reaching the app. Split the sheet " +
+      "into smaller files and upload them one after another — handles already in the " +
+      "directory are updated in place, so nothing is duplicated."
+    );
+  }
+  if (status === 504) {
+    return (
+      "The import ran out of time. Upload the sheet in a few smaller files instead — " +
+      "each one picks up where the last left off."
+    );
+  }
+  return `The import failed (HTTP ${status}). Nothing was saved, so it is safe to retry.`;
+}
+
 type Props = { onError: (message: string) => void };
 
 export default function DiscoverySection({ onError }: Props) {
@@ -187,9 +215,12 @@ export default function DiscoverySection({ onError }: Props) {
       const form = new FormData();
       form.append("file", file);
       const response = await fetch("/api/directory/import", { method: "POST", body: form });
+      // Not every failure reaches the route. A body over the host's request limit is
+      // rejected at the edge, which answers with an HTML page rather than our JSON, and
+      // the old fallback then blamed the file itself for a size limit it never hit.
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
-        onError(body.error ?? "Could not import that file.");
+        onError(body.error ?? importFailure(response.status, file.size));
         return;
       }
       setImported(body.summary);
@@ -197,7 +228,10 @@ export default function DiscoverySection({ onError }: Props) {
       reset();
       setReloadToken((value) => value + 1);
     } catch {
-      onError("Could not import that file.");
+      onError(
+        "The import did not finish. If the sheet is large, the connection may have " +
+          "dropped before it uploaded — try splitting it into smaller files.",
+      );
     } finally {
       setImporting(false);
       if (fileInput.current) fileInput.current.value = "";
