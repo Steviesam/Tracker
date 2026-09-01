@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { creatorKey, creatorsIn } from "@/lib/creators";
+import { resolveCreatorInput } from "@/lib/creators/resolve";
 import { summarise } from "@/lib/creators/types";
 import { buildCsv } from "@/lib/export";
 import { EMPTY_METRICS, type CreatorStats, type LinkResult } from "@/lib/types";
@@ -75,8 +76,51 @@ describe("summarise", () => {
     expect(stats.avgComments).toBe(3);
     // (15 + 3) / 1000 = 1.8%
     expect(stats.engagementRate).toBeCloseTo(1.8);
+    // (15 + 3) / 150 = 12%
+    expect(stats.engagementByViews).toBeCloseTo(12);
     expect(stats.sampleSize).toBe(2);
     expect(stats.status).toBe("ok");
+  });
+
+  it("still reports engagement against views when the follower count is unknown", () => {
+    const stats = summarise("INSTAGRAM", "nasa", videos, {
+      displayName: null,
+      profileUrl: null,
+      followers: null,
+      provider: "test",
+    });
+
+    expect(stats.engagementRate).toBeNull();
+    expect(stats.engagementByViews).toBeCloseTo(12);
+  });
+
+  it("says how few posts the like average is really over when the rest are hidden", () => {
+    const stats = summarise(
+      "INSTAGRAM",
+      "hidden",
+      [
+        { views: 100, likes: 40, comments: 1 },
+        { views: 100, likes: null, comments: 1 },
+        { views: 100, likes: null, comments: 1 },
+      ],
+      { displayName: null, profileUrl: null, followers: 1000, provider: "test" },
+    );
+
+    expect(stats.avgLikes).toBe(40);
+    expect(stats.note).toContain("likes are hidden on 2 of the last 3");
+    expect(stats.status).toBe("partial");
+  });
+
+  it("reads a rate above 100% as real when reach outruns the follower count", () => {
+    const stats = summarise("INSTAGRAM", "viral", [{ views: 1_741_738, likes: 88_081, comments: 877 }], {
+      displayName: null,
+      profileUrl: null,
+      followers: 67_736,
+      provider: "test",
+    });
+
+    expect(stats.engagementRate).toBeCloseTo(131.33, 1);
+    expect(stats.engagementByViews).toBeCloseTo(5.11, 1);
   });
 
   it("reports no engagement rate when followers are unknown", () => {
@@ -121,6 +165,66 @@ describe("summarise", () => {
   });
 });
 
+describe("reading pasted accounts", () => {
+  it("takes a handle, with or without the @", () => {
+    const { refs } = resolveCreatorInput("@lucky_memes00\nnasa");
+    expect(refs).toEqual([
+      { platform: "INSTAGRAM", creatorId: "lucky_memes00" },
+      { platform: "INSTAGRAM", creatorId: "nasa" },
+    ]);
+  });
+
+  it("reads the handle out of a profile link without spending a lookup", () => {
+    const { refs, contentUrls } = resolveCreatorInput(
+      "https://www.instagram.com/nasa/\ninstagram.com/lucky_memes00/reel/Da49tXeqveU/",
+    );
+    expect(refs).toEqual([
+      { platform: "INSTAGRAM", creatorId: "nasa" },
+      { platform: "INSTAGRAM", creatorId: "lucky_memes00" },
+    ]);
+    expect(contentUrls).toEqual([]);
+  });
+
+  it("defers a reel link that does not name its owner", () => {
+    const { refs, contentUrls } = resolveCreatorInput("https://www.instagram.com/reel/Da49tXeqveU/");
+    expect(refs).toEqual([]);
+    expect(contentUrls).toEqual(["https://www.instagram.com/reel/Da49tXeqveU/"]);
+  });
+
+  it("does not mistake Instagram's own pages for accounts", () => {
+    const { refs, rejected } = resolveCreatorInput("https://www.instagram.com/explore/tags/reels/");
+    expect(refs).toEqual([]);
+    expect(rejected).toHaveLength(1);
+  });
+
+  it("takes a YouTube handle or channel id, and defers a video", () => {
+    const { refs, contentUrls } = resolveCreatorInput(
+      "https://www.youtube.com/@MrBeast\n" +
+        "https://www.youtube.com/channel/UCX6OQ3DkcsbYNE6H8uQQuVA\n" +
+        "https://youtu.be/dQw4w9WgXcQ",
+    );
+    expect(refs).toEqual([
+      { platform: "YOUTUBE", creatorId: "@MrBeast" },
+      { platform: "YOUTUBE", creatorId: "UCX6OQ3DkcsbYNE6H8uQQuVA" },
+    ]);
+    expect(contentUrls).toEqual(["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]);
+  });
+
+  it("rejects Facebook, which has no account-level provider", () => {
+    const { refs, contentUrls, rejected } = resolveCreatorInput(
+      "https://www.facebook.com/reel/1234567890",
+    );
+    expect(refs).toEqual([]);
+    expect(contentUrls).toEqual([]);
+    expect(rejected).toHaveLength(1);
+  });
+
+  it("counts the same account once however it was pasted", () => {
+    const { refs } = resolveCreatorInput("@nasa\ninstagram.com/nasa\nnasa");
+    expect(refs).toHaveLength(1);
+  });
+});
+
 describe("csv export with creator stats", () => {
   const stats: CreatorStats = {
     platform: "INSTAGRAM",
@@ -133,6 +237,7 @@ describe("csv export with creator stats", () => {
     avgLikes: 15,
     avgComments: 3,
     engagementRate: 1.8,
+    engagementByViews: 12,
     status: "ok",
     note: null,
     provider: "test",

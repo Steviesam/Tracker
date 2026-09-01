@@ -69,15 +69,41 @@ export async function setResults(sid: string, results: LinkResult[]) {
   await prisma.workSession.update({ where: { sid }, data: { payload } });
 }
 
-/** Merges in newly fetched creators, keeping any already looked up in this session. */
+const EMPTY: SessionData = {
+  summary: {
+    sourceLabel: "Pasted accounts",
+    sheets: [],
+    rowsScanned: 0,
+    totalUrlsFound: 0,
+    duplicatesRemoved: 0,
+    unsupportedSkipped: 0,
+    uniqueLinks: 0,
+    byPlatform: { INSTAGRAM: 0, YOUTUBE: 0, FACEBOOK: 0 },
+  },
+  links: [],
+  results: [],
+  creatorStats: {},
+  lastRefreshedAt: null,
+};
+
+/**
+ * Merges in newly fetched creators, keeping any already looked up in this session.
+ *
+ * Creates the row when there is none: accounts can be looked up by pasting them straight
+ * into the engagement screen, so a session can hold creator stats without ever having
+ * held a link.
+ */
 export async function setCreatorStats(sid: string, stats: Record<CreatorKey, CreatorStats>) {
-  const existing = await getSession(sid);
-  if (!existing) return;
+  const existing = (await getSession(sid)) ?? EMPTY;
   const payload: SessionData = {
     ...existing,
     creatorStats: { ...existing.creatorStats, ...stats },
   };
-  await prisma.workSession.update({ where: { sid }, data: { payload } });
+  await prisma.workSession.upsert({
+    where: { sid },
+    create: { sid, payload },
+    update: { payload },
+  });
 }
 
 /**

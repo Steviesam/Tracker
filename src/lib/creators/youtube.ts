@@ -64,6 +64,20 @@ async function recentVideos(
   return { videos, note: null };
 }
 
+/**
+ * Trades an @handle for the channel id the rest of this file works in.
+ *
+ * A pasted YouTube account is a handle; every other call here is keyed by channel id, and
+ * `forHandle` accepts one at a time. 1 quota unit each, and only for handles.
+ */
+async function resolveHandle(handle: string, apiKey: string): Promise<string | null> {
+  const body = (await fetchJson(
+    `${API}/channels?part=id&forHandle=${encodeURIComponent(handle)}` +
+      `&key=${encodeURIComponent(apiKey)}`,
+  )) as { items?: Array<{ id?: string }> };
+  return body.items?.[0]?.id ?? null;
+}
+
 export const youtubeCreatorProvider: CreatorStatsProvider = {
   name: NAME,
 
@@ -71,16 +85,36 @@ export const youtubeCreatorProvider: CreatorStatsProvider = {
     return Boolean(youtubeApiKey());
   },
 
-  async fetch(creatorIds: string[]): Promise<Map<string, CreatorStats>> {
+  async fetch(requestedIds: string[]): Promise<Map<string, CreatorStats>> {
     const results = new Map<string, CreatorStats>();
     const apiKey = youtubeApiKey();
 
     if (!apiKey) {
-      for (const id of creatorIds) {
+      for (const id of requestedIds) {
         results.set(id, emptyStats("YOUTUBE", id, "unavailable", NOT_CONFIGURED, NAME));
       }
       return results;
     }
+
+    // Results are keyed by whatever the caller asked for, so a handle stays recognisable in
+    // the UI even though the lookups below run on its channel id.
+    const asked = new Map<string, string>();
+    for (const id of requestedIds) {
+      if (!id.startsWith("@")) {
+        asked.set(id, id);
+        continue;
+      }
+      try {
+        const channelId = await resolveHandle(id, apiKey);
+        if (channelId) asked.set(channelId, id);
+        else results.set(id, emptyStats("YOUTUBE", id, "unavailable", "No channel with that handle.", NAME));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "request failed";
+        results.set(id, emptyStats("YOUTUBE", id, "error", `YouTube API error: ${message}`, NAME));
+      }
+    }
+
+    const creatorIds = [...asked.keys()];
 
     for (const batch of chunk(creatorIds, BATCH)) {
       let channels: Channel[];
@@ -93,7 +127,8 @@ export const youtubeCreatorProvider: CreatorStatsProvider = {
       } catch (error) {
         const message = error instanceof Error ? error.message : "request failed";
         for (const id of batch) {
-          results.set(id, emptyStats("YOUTUBE", id, "error", `YouTube API error: ${message}`, NAME));
+          const key = asked.get(id) ?? id;
+          results.set(key, emptyStats("YOUTUBE", key, "error", `YouTube API error: ${message}`, NAME));
         }
         continue;
       }
@@ -102,11 +137,12 @@ export const youtubeCreatorProvider: CreatorStatsProvider = {
 
       await Promise.all(
         batch.map(async (id) => {
+          const key = asked.get(id) ?? id;
           const channel = byId.get(id);
           if (!channel) {
             results.set(
-              id,
-              emptyStats("YOUTUBE", id, "unavailable", "Channel not found or not public.", NAME),
+              key,
+              emptyStats("YOUTUBE", key, "unavailable", "Channel not found or not public.", NAME),
             );
             return;
           }
@@ -129,8 +165,8 @@ export const youtubeCreatorProvider: CreatorStatsProvider = {
           }
 
           results.set(
-            id,
-            summarise("YOUTUBE", id, videos, {
+            key,
+            summarise("YOUTUBE", key, videos, {
               displayName: channel.snippet?.title ?? null,
               profileUrl: customUrl
                 ? `https://www.youtube.com/${customUrl}`

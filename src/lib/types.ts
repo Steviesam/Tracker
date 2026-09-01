@@ -90,6 +90,16 @@ export type CreatorStats = {
    * unknown, since a rate without a denominator would be meaningless.
    */
   engagementRate: number | null;
+  /**
+   * (avg likes + avg comments) / avg views, as a percentage.
+   *
+   * The rate above divides by followers, which is the standard definition and the one that
+   * was asked for, but reels are shown to people who do not follow the account: a small
+   * account with one viral reel comes out above 100%, which reads as a broken number rather
+   * than as the real thing it is. This divides by the audience the videos actually reached,
+   * so the two together say whether a high rate came from a loyal audience or from reach.
+   */
+  engagementByViews: number | null;
   status: ResultStatus;
   note: string | null;
   provider: string;

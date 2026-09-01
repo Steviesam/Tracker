@@ -62,6 +62,8 @@ export default function CreatorStatsPanel({ stats }: { stats: CreatorStats[] }) 
         const initial = (creator.displayName ?? creator.creatorId).trim().charAt(0).toUpperCase();
         const rate = creator.engagementRate;
         const fill = rate === null ? 0 : Math.min(100, (rate / RATE_SCALE) * 100);
+        const interactions =
+          creator.avgLikes === null ? null : creator.avgLikes + (creator.avgComments ?? 0);
 
         return (
           <article
@@ -121,6 +123,33 @@ export default function CreatorStatsPanel({ stats }: { stats: CreatorStats[] }) 
                   style={{ width: `${fill}%` }}
                 />
               </span>
+
+              <div className="mt-2 flex items-baseline justify-between">
+                <span
+                  className="text-xs text-slate-500"
+                  title="(avg likes + avg comments) ÷ avg views"
+                >
+                  Of the people who saw it
+                </span>
+                <span className="text-xs tabular-nums text-slate-600">
+                  {creator.engagementByViews === null ? (
+                    <NA reason={creator.note} />
+                  ) : (
+                    formatPercent(creator.engagementByViews)
+                  )}
+                </span>
+              </div>
+
+              {rate !== null && rate > 100 && interactions !== null && creator.followers !== null ? (
+                // The arithmetic rather than a reassurance: the reader can check it against
+                // the rows below, which is the only thing that makes a number this large
+                // believable.
+                <p className="mt-1.5 text-xs leading-snug text-slate-500">
+                  {formatMetric(interactions)} likes and comments per video against{" "}
+                  {formatMetric(creator.followers)} followers. Reels are shown to people who do
+                  not follow the account, so this can pass 100%.
+                </p>
+              ) : null}
             </div>
 
             <dl className="space-y-2 p-4">

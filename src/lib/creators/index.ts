@@ -46,17 +46,30 @@ export function creatorsIn(results: LinkResult[]): Array<{ platform: Platform; c
 export async function fetchCreatorStats(
   results: LinkResult[],
 ): Promise<Record<CreatorKey, CreatorStats>> {
-  const byPlatform = new Map<Platform, string[]>();
-  for (const { platform, creatorId } of creatorsIn(results)) {
+  return fetchStatsFor(creatorsIn(results));
+}
+
+/**
+ * The same lookup for accounts named directly rather than inferred from a batch of links,
+ * which is what the engagement screen's own input needs.
+ */
+export async function fetchStatsFor(
+  creators: Array<{ platform: Platform; creatorId: string }>,
+): Promise<Record<CreatorKey, CreatorStats>> {
+  // A set, because every account here costs a provider call and the same handle can easily
+  // be pasted twice, or arrive both as a handle and as one of its own reels.
+  const byPlatform = new Map<Platform, Set<string>>();
+  for (const { platform, creatorId } of creators) {
     const bucket = byPlatform.get(platform);
-    if (bucket) bucket.push(creatorId);
-    else byPlatform.set(platform, [creatorId]);
+    if (bucket) bucket.add(creatorId);
+    else byPlatform.set(platform, new Set([creatorId]));
   }
 
   const out: Record<string, CreatorStats> = {};
 
   await Promise.all(
-    [...byPlatform.entries()].map(async ([platform, creatorIds]) => {
+    [...byPlatform.entries()].map(async ([platform, ids]) => {
+      const creatorIds = [...ids];
       const provider = PROVIDERS[platform];
 
       if (!provider) {

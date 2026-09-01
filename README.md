@@ -146,7 +146,29 @@ Views are deliberately left out of that numerator. A reel's reach is dominated b
 the algorithm pushed it, so including views would measure distribution rather than how
 engaged the account's own audience is.
 
-This is behind a **Get creator stats** button rather than running automatically, because
+### Paste an account, or use the ones from the links
+
+Engagement belongs to an account, so the section asks for one directly: a profile link, an
+`@handle`, or a YouTube channel URL. A reel link works too — nobody remembers handles, they
+have the reel that made them curious — but `instagram.com/reel/{code}` does not name its
+owner, so that costs one extra lookup to find out who posted it. `instagram.com/{handle}/
+reel/{code}` names the owner and costs nothing extra.
+
+The button that looks up every creator in the metrics results is still there; it is now one
+of two ways in rather than the only one.
+
+### A rate above 100% is not a broken number
+
+`(avg likes + avg comments) ÷ followers` is the standard definition and the one this
+reports. It can exceed 100%, and legitimately: an account with 68,000 followers whose reels
+average 1.7 million views was measured at 131%, because reels are shown to people who do not
+follow the account.
+
+Each card therefore also shows the same interactions **as a share of views**, which for that
+account is 5.1%. Read together they say where a high rate came from — a loyal audience, or
+reach. Both are in the exports.
+
+Looking up accounts is behind a button rather than running automatically, because
 Instagram costs one provider lookup per creator (two, with follower counts). Lookups are
 per creator, not per link, so fifty links from five creators cost five lookups. Results are
 cached for the session and included in both exports — extra columns on the results sheet,

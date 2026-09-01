@@ -39,6 +39,7 @@ export function emptyStats(
     avgLikes: null,
     avgComments: null,
     engagementRate: null,
+    engagementByViews: null,
     status,
     note,
     provider,
@@ -71,14 +72,34 @@ export function summarise(
   const avgLikes = average(videos.map((video) => video.likes));
   const avgComments = average(videos.map((video) => video.comments));
 
-  const canRate = meta.followers !== null && meta.followers > 0 && avgLikes !== null;
-  const engagementRate = canRate
-    ? ((avgLikes + (avgComments ?? 0)) / (meta.followers as number)) * 100
-    : null;
+  const interactions = avgLikes === null ? null : avgLikes + (avgComments ?? 0);
+
+  const engagementRate =
+    interactions !== null && meta.followers !== null && meta.followers > 0
+      ? (interactions / meta.followers) * 100
+      : null;
+
+  const engagementByViews =
+    interactions !== null && avgViews !== null && avgViews > 0
+      ? (interactions / avgViews) * 100
+      : null;
 
   const gaps: string[] = [];
   if (videos.length === 0) gaps.push("no recent videos were returned");
   if (meta.followers === null) gaps.push("follower count unavailable, so no engagement rate");
+
+  // An account can hide likes on some of its posts but not others, and the average is then
+  // built from a smaller sample than the card's "last 10" implies. Left unsaid, a creator
+  // whose only visible likes are on a viral reel looks far more engaging than they are.
+  const withLikes = videos.filter((video) => video.likes !== null).length;
+  if (videos.length > 0 && withLikes < videos.length) {
+    gaps.push(
+      withLikes === 0
+        ? "this account hides its like counts, so there is no engagement rate"
+        : `likes are hidden on ${videos.length - withLikes} of the last ${videos.length}, ` +
+          `so the average is over ${withLikes}`,
+    );
+  }
 
   const notes = [meta.note, gaps.length > 0 ? `${gaps.join("; ")}.` : null].filter(Boolean);
 
@@ -93,6 +114,7 @@ export function summarise(
     avgLikes,
     avgComments,
     engagementRate,
+    engagementByViews,
     status: gaps.length > 0 ? "partial" : "ok",
     note: notes.length > 0 ? notes.join(" ") : null,
     provider: meta.provider,

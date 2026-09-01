@@ -149,18 +149,28 @@ export default function Dashboard({
     }
   }, []);
 
-  // Kept separate from runFetch because each creator costs an extra provider call.
-  const loadCreatorStats = useCallback(async () => {
+  /**
+   * Kept separate from runFetch because each creator costs an extra provider call.
+   * With text, the accounts come from what was pasted; without it, from the current results.
+   */
+  const loadCreatorStats = useCallback(async (text?: string) => {
     setBusy("creators");
     setError(null);
     try {
-      const response = await fetch("/api/creators", { method: "POST" });
+      const response = await fetch("/api/creators", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text ?? "" }),
+      });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
         setError(body.error ?? "Could not fetch creator stats.");
         return;
       }
       setCreatorStats(body.creatorStats ?? {});
+      if (Array.isArray(body.skipped) && body.skipped.length > 0) {
+        setError(`Could not read an account from: ${body.skipped.join(", ")}`);
+      }
     } catch {
       setError("Could not fetch creator stats.");
     } finally {
@@ -311,6 +321,7 @@ export default function Dashboard({
             available={creatorStatsAvailable}
             busy={busy}
             onFetch={() => void loadCreatorStats()}
+            onLookUp={(text) => void loadCreatorStats(text)}
             onGoToLinks={() => selectSection("links")}
           />
         ) : (
