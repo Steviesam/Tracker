@@ -508,10 +508,13 @@ Then open **Discovery** and upload your creator sheet.
 ### Limits worth knowing
 
 **Uploads are capped at 4.5 MB.** Vercel rejects a larger request body before your code sees
-it, and no setting changes that. A 10,000-row `.xlsx` is normally well under a megabyte, so
-this rarely bites — but set `MAX_UPLOAD_MB=4` so the app refuses oversized files with a clear
-message rather than letting Vercel return a bare `413`. For anything larger, split the sheet
-into a few uploads; the import merges on username, so nothing is duplicated.
+it, and no setting changes that — not on any plan. A 10,000-row `.xlsx` is normally well under
+a megabyte, so this rarely bites. Set `MAX_UPLOAD_MB=4` so the app refuses oversized files with
+a clear message rather than letting Vercel return a bare `413` that the browser cannot explain.
+
+For a sheet that genuinely is larger, import it from your own machine instead of the browser
+(see [Importing a large sheet](#importing-a-large-sheet)). Splitting the file into a few
+uploads also works — the import merges on username, so nothing is duplicated.
 
 **Functions stop at 300 seconds** on Hobby, which is what `/api/process`,
 `/api/creators` and `/api/directory/import` already declare. Fetching a few hundred links or
@@ -532,7 +535,27 @@ npm run lint         # eslint
 npm run db:up        # start Postgres
 npm run db:migrate   # create/apply migrations (dev)
 npm run db:studio    # browse the database
+
+npm run import:creators -- sheet.xlsx   # load a sheet without the browser
 ```
+
+### Importing a large sheet
+
+The browser upload cannot carry more than a few megabytes, because the host refuses the
+request before the app sees it. Your own machine has no such ceiling, so a first load of a
+big directory goes in from the command line:
+
+```bash
+DATABASE_URL="<the Neon pooled URL>" npm run import:creators -- ~/Desktop/creators.xlsx
+```
+
+It prints which host it is writing to before it starts, so a sheet meant for your laptop
+does not land in production by accident. Several files in one command are fine.
+
+This runs the same parser and the same upsert as the web upload — the same column guessing,
+the same state and category cleanup, the same merge on username. It is the identical code
+path, deliberately, so the two can never disagree about what a sheet means. Only the
+transport differs.
 
 `samples/sample-links.csv` covers the awkward cases: two links in one cell, the same video
 in three URL forms, a link with no scheme, a profile page, and an unsupported platform.
