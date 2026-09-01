@@ -182,6 +182,16 @@ The numbers were verified against Instagram's own `metrics` object for a public 
 object, **including share counts**. `apify~instagram-scraper` also works and is still
 supported, but omits shares, so Instagram rows show `N/A` for them.
 
+### A hidden count is not a zero
+
+An account can hide its like count. Instagram then sends `-1` for that post instead of
+leaving the field out, so anything reading the number at face value records a post with
+negative likes. Every count is checked for this and becomes `N/A` instead.
+
+It matters most in the creator averages, which are built from a creator's last ten reels: a
+single hidden-like reel in that sample would otherwise pull the average down by a tenth, and
+the engagement rate computed from that average would inherit the error.
+
 ## Creator discovery
 
 Search a directory of Instagram creators by **state**, **city**, **category/niche** and

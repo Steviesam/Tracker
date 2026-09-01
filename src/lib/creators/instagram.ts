@@ -1,7 +1,7 @@
 import { runActor, type ApifyItem } from "@/lib/apify";
 import { apifyConfig } from "@/lib/env";
 import { emptyStats, summarise, type CreatorStatsProvider, type CreatorVideo } from "@/lib/creators/types";
-import { toNumber } from "@/lib/providers/types";
+import { toCount } from "@/lib/providers/types";
 import { CREATOR_SAMPLE_SIZE, type CreatorStats } from "@/lib/types";
 
 /**
@@ -19,12 +19,18 @@ const NAME = "apify:instagram-creator";
 const NOT_CONFIGURED =
   "Instagram creator stats are not configured. Set APIFY_TOKEN and APIFY_INSTAGRAM_REELS_ACTOR.";
 
-/** Reads the reels actor output. See public-data.ts for why plays are used as "views". */
+/**
+ * Reads the reels actor output. See public-data.ts for why plays are used as "views".
+ *
+ * A reel whose likes are hidden arrives as -1, which has to stay out of the average: one
+ * such reel in a sample of ten pulls the mean down by a tenth of the real figure, and the
+ * engagement rate built on it inherits the error.
+ */
 function toVideo(item: ApifyItem): CreatorVideo {
   return {
-    views: toNumber(item.videoPlayCount) ?? toNumber(item.videoViewCount) ?? toNumber(item.playCount),
-    likes: toNumber(item.likesCount),
-    comments: toNumber(item.commentsCount),
+    views: toCount(item.videoPlayCount) ?? toCount(item.videoViewCount) ?? toCount(item.playCount),
+    likes: toCount(item.likesCount),
+    comments: toCount(item.commentsCount),
   };
 }
 
@@ -47,7 +53,7 @@ async function loadFollowers(
     const profile = items[0];
     if (!profile) return { followers: null, displayName: null, note: "Profile not found." };
     return {
-      followers: toNumber(profile.followersCount),
+      followers: toCount(profile.followersCount),
       displayName: typeof profile.fullName === "string" ? profile.fullName : null,
       note: null,
     };

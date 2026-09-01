@@ -2,8 +2,8 @@ import { apifyConfig } from "@/lib/env";
 import type { DetectedLink, Platform } from "@/lib/types";
 import {
   errored,
+  toCount,
   toIsoDate,
-  toNumber,
   unavailable,
   type MetricsProvider,
   type ProviderOutcome,
@@ -30,9 +30,10 @@ const RUN_TIMEOUT_MS = 120_000;
 
 type ApifyItem = Record<string, unknown>;
 
+/** Skips a key whose value is a hidden-count sentinel, so a later spelling can answer. */
 function firstNumber(item: ApifyItem, keys: string[]): number | null {
   for (const key of keys) {
-    const value = toNumber(item[key]);
+    const value = toCount(item[key]);
     if (value !== null) return value;
   }
   return null;
@@ -87,7 +88,10 @@ export function normaliseItem(raw: ApifyItem): {
 } {
   const item = flatten(raw);
   return {
-    url: firstString(item, ["url", "postUrl", "inputUrl", "permalink", "link"]),
+    // `postCode` is last because on a successful row it holds a shortcode rather than a
+    // URL; on a failed one it is the only echo of which URL the row is about, and without
+    // it the failure cannot be matched back to a link and is reported as silence instead.
+    url: firstString(item, ["url", "postUrl", "inputUrl", "permalink", "link", "postCode"]),
     creator: firstString(item, [
       "ownerUsername",
       "username",
@@ -147,6 +151,7 @@ export function normaliseItem(raw: ApifyItem): {
 function itemFailure(item: ApifyItem): string | null {
   const error = firstString(item, ["errorDescription", "error"]);
   if (error) return error;
+  if (item.success === false) return "the provider could not read this post";
   const status = firstString(item, ["status"]);
   return status && status.toLowerCase() !== "available" ? status : null;
 }

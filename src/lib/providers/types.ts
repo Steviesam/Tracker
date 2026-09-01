@@ -54,6 +54,18 @@ export function toNumber(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+/**
+ * A count, or null when the platform is not reporting one.
+ *
+ * Instagram sends -1 rather than omitting the field when an account has hidden its like
+ * count. Read as a number that is "unknown, and the account chose that", not a value: left
+ * alone it silently drags every average it lands in below the truth.
+ */
+export function toCount(value: unknown): number | null {
+  const parsed = toNumber(value);
+  return parsed !== null && parsed >= 0 ? parsed : null;
+}
+
 /** Accepts ISO strings and unix seconds/milliseconds; returns an ISO string or null. */
 export function toIsoDate(value: unknown): string | null {
   if (value === null || value === undefined || value === "") return null;
