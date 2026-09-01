@@ -45,7 +45,16 @@ model Creator {
   /// creator in three categories, and each should find them.
   niches String[]
 
+  /// The best count known, whatever its source. Everything filters, sorts and displays
+  /// this one number, so there is never a second figure to reconcile.
   followers Int?
+
+  /// `sheet` or `live`. Sheets round ("309k"), so a live value is never replaced by a
+  /// later import, and the UI can say which one the user is looking at.
+  followersSource String?
+
+  /// When the live lookup ran. Null while the count is still the sheet's.
+  followersCheckedAt DateTime?
 
   /// Free-text extras from the sheet that do not map to a column, kept so nothing is lost.
   notes String?

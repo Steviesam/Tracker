@@ -311,7 +311,33 @@ with no explanation, because that pairing is never offered.
 Follower presets follow the industry bands — Nano (under 10K), Micro (10K–100K), Mid
 (100K–500K), Macro (500K–1M), Mega (1M+). Filtering and paging run in Postgres, so a
 directory of tens of thousands of rows stays responsive. Follower counts on the cards are
-the exact stored number, not a rounded `1.2M`.
+the exact stored number, never a rounded `1.2M`.
+
+### Sheet counts versus the live count
+
+A maintained sheet holds whatever was true the day someone typed it, and it is nearly always
+rounded — `309k` where the profile says 309,412. That is close enough to filter on and wrong
+on a card, where the user is comparing against the number Instagram is showing them right now.
+
+So every card labels its own figure. **From sheet** is the uploaded value; clicking it fetches
+the exact count from Instagram, and the label becomes **Live** with the time of the check in
+its tooltip. The header button does the same for every unchecked creator on the page at once.
+
+It is a click rather than something automatic because each lookup is a billed actor call
+(`APIFY_INSTAGRAM_PROFILE_ACTOR`); refreshing a 5,000-row directory on load would be 5,000 of
+them. For the same reason a refresh covers one screenful at a time, so the cost is always
+visible in what is on screen.
+
+Two rules keep the number trustworthy afterwards:
+
+- A creator the actor could not read — private, renamed, deleted — keeps its sheet figure and
+  reports why. Blanking it would turn "we did not check" into "this creator has no audience",
+  which looks identical on a card and is the more expensive mistake.
+- A later import never overwrites a live count with a sheet one. `followersSource` records
+  where the stored number came from, and the upsert skips any row already marked `live`.
+
+Only one number is ever stored, so filtering, sorting and the card all agree; there is never a
+second figure to reconcile.
 
 ## Accounts and security
 

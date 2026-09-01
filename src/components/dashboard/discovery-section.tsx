@@ -5,6 +5,7 @@ import {
   IconCompass,
   IconFilter,
   IconPin,
+  IconRefresh,
   IconSearch,
   IconTag,
   IconUpload,
@@ -13,6 +14,7 @@ import {
 import {
   EMPTY_FILTERS,
   FOLLOWER_BANDS,
+  MAX_REFRESH,
   PAGE_SIZE,
   SORT_KEYS,
   type DirectoryCreator,
@@ -20,6 +22,7 @@ import {
   type Facet,
   type Facets,
   type ImportSummary,
+  type LiveFollowers,
   type SortKey,
 } from "@/lib/directory/types";
 import { formatMetric } from "@/lib/format";
@@ -44,6 +47,7 @@ export default function DiscoverySection({ onError }: Props) {
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   const [imported, setImported] = useState<ImportSummary | null>(null);
+  const [refreshing, setRefreshing] = useState<string[]>([]);
 
   const fileInput = useRef<HTMLInputElement>(null);
   // Facets only change on import, so they are requested once and then on demand.
@@ -98,6 +102,61 @@ export default function DiscoverySection({ onError }: Props) {
     const timer = setTimeout(() => void load(), filters.search ? 300 : 0);
     return () => clearTimeout(timer);
   }, [load, filters.search]);
+
+  /**
+   * Swaps the sheet's rounded count for the one Instagram shows now.
+   *
+   * The new number is patched into the rows already on screen instead of re-running the
+   * search: a creator whose live count crosses the selected follower band would otherwise
+   * vanish from the page the moment the user checked it, which reads as a bug.
+   */
+  const refresh = useCallback(
+    async (usernames: string[]) => {
+      if (usernames.length === 0) return;
+      setRefreshing((current) => [...new Set([...current, ...usernames])]);
+      try {
+        const response = await fetch("/api/directory/refresh", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ usernames }),
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          onError(body.error ?? "Could not refresh follower counts.");
+          return;
+        }
+
+        const results: LiveFollowers[] = body.results ?? [];
+        const live = new Map(results.map((result) => [result.username, result]));
+        setCreators((current) =>
+          current.map((creator) => {
+            const result = live.get(creator.username);
+            if (!result || result.followers === null) return creator;
+            return {
+              ...creator,
+              followers: result.followers,
+              followersSource: "live",
+              followersCheckedAt: result.checkedAt,
+            };
+          }),
+        );
+
+        const failed = results.filter((result) => result.error);
+        if (failed.length > 0) {
+          onError(
+            failed.length === 1
+              ? `@${failed[0].username}: ${failed[0].error}`
+              : `${failed.length} of ${results.length} handles could not be checked. ${failed[0].error}`,
+          );
+        }
+      } catch {
+        onError("Could not reach Instagram for follower counts.");
+      } finally {
+        setRefreshing((current) => current.filter((name) => !usernames.includes(name)));
+      }
+    },
+    [onError],
+  );
 
   function update(patch: Partial<DirectoryFilters>) {
     setFilters((current) => ({ ...current, ...patch }));
@@ -160,6 +219,17 @@ export default function DiscoverySection({ onError }: Props) {
       .sort((a, b) => a.value.localeCompare(b.value));
   }, [facets, filters.state]);
 
+  // Only the cards still showing the sheet's figure, so the bulk button never spends a
+  // lookup on a creator the user just checked.
+  const unchecked = useMemo(
+    () =>
+      creators
+        .filter((creator) => creator.followersSource !== "live")
+        .map((creator) => creator.username)
+        .slice(0, MAX_REFRESH),
+    [creators],
+  );
+
   const activeCount = [
     filters.state,
     filters.city,
@@ -203,14 +273,32 @@ export default function DiscoverySection({ onError }: Props) {
               </div>
             </div>
 
-            <button
-              className="btn-secondary"
-              onClick={() => fileInput.current?.click()}
-              disabled={importing}
-            >
-              <IconUpload className="h-4 w-4" />
-              {importing ? "Importing…" : "Import sheet"}
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              {unchecked.length > 0 ? (
+                <button
+                  className="btn-secondary"
+                  onClick={() => void refresh(unchecked)}
+                  disabled={refreshing.length > 0}
+                  title="Fetches the exact count from Instagram for the creators on this page that still show the sheet's figure. One lookup each."
+                >
+                  <IconRefresh
+                    className={`h-4 w-4 ${refreshing.length > 0 ? "animate-spin" : ""}`}
+                  />
+                  {refreshing.length > 0
+                    ? "Checking…"
+                    : `Check ${unchecked.length} against Instagram`}
+                </button>
+              ) : null}
+
+              <button
+                className="btn-secondary"
+                onClick={() => fileInput.current?.click()}
+                disabled={importing}
+              >
+                <IconUpload className="h-4 w-4" />
+                {importing ? "Importing…" : "Import sheet"}
+              </button>
+            </div>
           </div>
 
           {imported ? (
@@ -367,7 +455,13 @@ export default function DiscoverySection({ onError }: Props) {
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {creators.map((creator, index) => (
-                <CreatorCard key={creator.id} creator={creator} index={index} />
+                <CreatorCard
+                  key={creator.id}
+                  creator={creator}
+                  index={index}
+                  refreshing={refreshing.includes(creator.username)}
+                  onRefresh={() => void refresh([creator.username])}
+                />
               ))}
             </div>
           )}
@@ -377,8 +471,31 @@ export default function DiscoverySection({ onError }: Props) {
   );
 }
 
-function CreatorCard({ creator, index }: { creator: DirectoryCreator; index: number }) {
+/** "3 minutes ago", so a card can say how old a live count is without a date library. */
+function sinceLabel(iso: string | null): string {
+  if (!iso) return "";
+  const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
+  if (!Number.isFinite(minutes) || minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.round(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
+function CreatorCard({
+  creator,
+  index,
+  refreshing,
+  onRefresh,
+}: {
+  creator: DirectoryCreator;
+  index: number;
+  refreshing: boolean;
+  onRefresh: () => void;
+}) {
   const place = [creator.city, creator.state].filter(Boolean).join(", ");
+  const live = creator.followersSource === "live";
 
   return (
     <article
@@ -405,18 +522,37 @@ function CreatorCard({ creator, index }: { creator: DirectoryCreator; index: num
         </div>
 
         <div className="shrink-0 text-right">
-          {/* The exact stored count, not a rounded 1.2M — the whole point of the sheet is
-              that the numbers are precise enough to compare creators against each other. */}
+          {/* Never abbreviated to 1.2M: the user is comparing this against the number on
+              the profile itself, and a rounded figure reads as a mismatch. */}
           <p className="text-sm font-semibold tabular-nums">
             {creator.followers === null ? (
-              <span className="text-slate-300" title="Not in the sheet">
+              <span className="text-slate-300" title="No follower count in the sheet">
                 N/A
               </span>
             ) : (
               formatMetric(creator.followers)
             )}
           </p>
-          <p className="label">Followers</p>
+
+          {/* Which number this is, and a way to replace it. A sheet is typed by hand and
+              rounded to "309k", so it will not match the profile; saying so is better than
+              letting the user assume the app is wrong. */}
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={refreshing}
+            title={
+              live
+                ? `From Instagram, checked ${sinceLabel(creator.followersCheckedAt)}. Click to check again.`
+                : "This is the figure from your sheet, usually rounded. Click to fetch the exact count from Instagram."
+            }
+            className={`label mt-0.5 ml-auto flex items-center gap-1 transition-colors disabled:opacity-60 ${
+              live ? "text-emerald-600 hover:text-emerald-700" : "hover:text-slate-900"
+            }`}
+          >
+            <IconRefresh className={`h-3 w-3 ${refreshing ? "animate-spin" : ""}`} />
+            {refreshing ? "Checking…" : live ? "Live" : "From sheet"}
+          </button>
         </div>
       </div>
 

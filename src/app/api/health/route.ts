@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { isConfigured as liveFollowersConfigured } from "@/lib/directory/live";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +23,9 @@ export async function GET() {
     databaseUrl: Boolean(process.env.DATABASE_URL?.trim()),
     // The app refuses anything shorter, so a too-short value is as broken as a missing one.
     sessionSecret: secret.trim().length >= 32,
+    // Optional, so it is never a problem — but it is the difference between a directory
+    // card showing the sheet's rounded "309k" and the count Instagram shows now.
+    liveFollowers: liveFollowersConfigured(),
   };
 
   const database = { reachable: false, migrated: false, code: null as string | null };

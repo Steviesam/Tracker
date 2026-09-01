@@ -36,7 +36,7 @@ export async function getSession(sid: string): Promise<SessionData | null> {
   const row = await prisma.workSession.findUnique({ where: { sid } });
   if (!row) return null;
   if (row.updatedAt.getTime() < Date.now() - TTL_MS) {
-    await prisma.workSession.delete({ where: { sid } }).catch(() => undefined);
+    await prisma.workSession.deleteMany({ where: { sid } });
     return null;
   }
   return asData(row.payload);
@@ -80,6 +80,11 @@ export async function setCreatorStats(sid: string, stats: Record<CreatorKey, Cre
   await prisma.workSession.update({ where: { sid }, data: { payload } });
 }
 
+/**
+ * deleteMany rather than delete: logging out without having uploaded anything is normal,
+ * and `delete` treats a missing row as an error — it logged a stack trace on every such
+ * logout, which makes the real errors in the log harder to see.
+ */
 export async function clearSession(sid: string) {
-  await prisma.workSession.delete({ where: { sid } }).catch(() => undefined);
+  await prisma.workSession.deleteMany({ where: { sid } });
 }

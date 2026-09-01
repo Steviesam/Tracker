@@ -15,7 +15,22 @@ export type DirectoryCreator = {
   /** Every category that applies, since a sheet writes them run-on as `Fashion/lifestyle`. */
   niches: string[];
   followers: number | null;
+  /** Whether `followers` is the sheet's rounded figure or a live lookup. */
+  followersSource: FollowersSource;
+  /** ISO timestamp of the live lookup, so a card can say how stale the number is. */
+  followersCheckedAt: string | null;
   notes: string | null;
+};
+
+export type FollowersSource = "sheet" | "live" | null;
+
+/** One handle's result from a live follower lookup. */
+export type LiveFollowers = {
+  username: string;
+  followers: number | null;
+  checkedAt: string | null;
+  /** Why this one handle has no live number, when the others do. */
+  error: string | null;
 };
 
 export type DirectoryFilters = {
@@ -66,6 +81,12 @@ export const FOLLOWER_BANDS: Array<{ id: string; label: string; min: number; max
   ];
 
 export const PAGE_SIZE = 24;
+
+/**
+ * Handles per live-refresh call. One screenful, so "refresh what I am looking at" is a
+ * single request; more than that and the cost stops being obvious from what is on screen.
+ */
+export const MAX_REFRESH = PAGE_SIZE;
 
 /** What one tab of the workbook contributed, so gaps in coverage are visible. */
 export type SheetReport = {

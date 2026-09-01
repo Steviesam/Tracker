@@ -62,13 +62,26 @@ export async function findCreators(
         city: true,
         niches: true,
         followers: true,
+        followersSource: true,
+        followersCheckedAt: true,
         notes: true,
       },
     }),
     prisma.creator.count({ where }),
   ]);
 
-  return { creators, total, page, pageSize: PAGE_SIZE };
+  return {
+    // Dates are flattened here rather than in the component: this page crosses a JSON
+    // boundary, where a Date silently becomes a string the types still claim is a Date.
+    creators: creators.map(({ followersSource, followersCheckedAt, ...creator }) => ({
+      ...creator,
+      followersSource: followersSource === "live" || followersSource === "sheet" ? followersSource : null,
+      followersCheckedAt: followersCheckedAt?.toISOString() ?? null,
+    })),
+    total,
+    page,
+    pageSize: PAGE_SIZE,
+  };
 }
 
 /**

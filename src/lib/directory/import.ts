@@ -164,7 +164,7 @@ export async function readCreators(
 
 /**
  * Rows per statement. Postgres caps a query at 65,535 bind parameters, and each row here
- * binds eight, so 500 leaves ample headroom while keeping a 10,000-row import to 20 round
+ * binds nine, so 500 leaves ample headroom while keeping a 10,000-row import to 20 round
  * trips rather than 10,000.
  */
 const CHUNK = 500;
@@ -199,6 +199,7 @@ export async function upsertCreators(
             ${record.city},
             ${record.niches},
             ${record.followers},
+            ${record.followers === null ? null : "sheet"},
             ${record.notes},
             ${sourceFile},
             NOW(),
@@ -209,7 +210,8 @@ export async function upsertCreators(
         written += await tx.$executeRaw`
           INSERT INTO "Creator" (
             "id", "username", "displayName", "state", "city",
-            "niches", "followers", "notes", "sourceFile", "createdAt", "updatedAt"
+            "niches", "followers", "followersSource", "notes", "sourceFile",
+            "createdAt", "updatedAt"
           )
           VALUES ${Prisma.join(values)}
           ON CONFLICT ("username") DO UPDATE SET
@@ -221,7 +223,17 @@ export async function upsertCreators(
                               WHEN cardinality(EXCLUDED."niches") > 0 THEN EXCLUDED."niches"
                               ELSE "Creator"."niches"
                             END,
-            "followers"   = COALESCE(EXCLUDED."followers",   "Creator"."followers"),
+            -- A sheet rounds to "309k"; a live lookup does not. Once a creator has been
+            -- checked against Instagram, a later upload must not walk that back.
+            "followers"   = CASE
+                              WHEN "Creator"."followersSource" = 'live' THEN "Creator"."followers"
+                              ELSE COALESCE(EXCLUDED."followers", "Creator"."followers")
+                            END,
+            "followersSource" = CASE
+                              WHEN "Creator"."followersSource" = 'live' THEN 'live'
+                              WHEN EXCLUDED."followers" IS NOT NULL THEN 'sheet'
+                              ELSE "Creator"."followersSource"
+                            END,
             "notes"       = COALESCE(EXCLUDED."notes",       "Creator"."notes"),
             "sourceFile"  = EXCLUDED."sourceFile",
             "updatedAt"   = NOW()

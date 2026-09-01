@@ -1,3 +1,4 @@
+import { runActor, type ApifyItem } from "@/lib/apify";
 import { apifyConfig } from "@/lib/env";
 import { emptyStats, summarise, type CreatorStatsProvider, type CreatorVideo } from "@/lib/creators/types";
 import { toNumber } from "@/lib/providers/types";
@@ -14,36 +15,9 @@ import { CREATOR_SAMPLE_SIZE, type CreatorStats } from "@/lib/types";
  */
 
 const NAME = "apify:instagram-creator";
-const RUN_TIMEOUT_MS = 180_000;
 
 const NOT_CONFIGURED =
   "Instagram creator stats are not configured. Set APIFY_TOKEN and APIFY_INSTAGRAM_REELS_ACTOR.";
-
-type ApifyItem = Record<string, unknown>;
-
-async function runActor(actorId: string, token: string, input: unknown): Promise<ApifyItem[]> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), RUN_TIMEOUT_MS);
-  try {
-    const response = await fetch(
-      `https://api.apify.com/v2/acts/${encodeURIComponent(actorId)}/run-sync-get-dataset-items`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(input),
-        signal: controller.signal,
-      },
-    );
-    if (!response.ok) {
-      const detail = await response.text().catch(() => "");
-      throw new Error(`${response.status} ${response.statusText}${detail ? ` — ${detail.slice(0, 160)}` : ""}`);
-    }
-    const body = await response.json();
-    return Array.isArray(body) ? (body as ApifyItem[]) : [];
-  } finally {
-    clearTimeout(timer);
-  }
-}
 
 /** Reads the reels actor output. See public-data.ts for why plays are used as "views". */
 function toVideo(item: ApifyItem): CreatorVideo {
