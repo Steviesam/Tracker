@@ -21,6 +21,10 @@ export async function GET() {
 
   const config = {
     databaseUrl: Boolean(process.env.DATABASE_URL?.trim()),
+    // Only the build's migration step reads this, so a missing one breaks the deploy
+    // rather than the running app — but it is the same class of mistake, and this is
+    // where people come looking.
+    directDatabaseUrl: Boolean(process.env.DIRECT_DATABASE_URL?.trim()),
     // The app refuses anything shorter, so a too-short value is as broken as a missing one.
     sessionSecret: secret.trim().length >= 32,
     // Optional, so it is never a problem — but it is the difference between a directory
@@ -46,6 +50,9 @@ export async function GET() {
 
   const problems: string[] = [];
   if (!config.databaseUrl) problems.push("DATABASE_URL is not set.");
+  if (!config.directDatabaseUrl) {
+    problems.push("DIRECT_DATABASE_URL is not set; migrations cannot run on the next deploy.");
+  }
   if (!config.sessionSecret) {
     problems.push("APP_SESSION_SECRET is missing or shorter than 32 characters.");
   }

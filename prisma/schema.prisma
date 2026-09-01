@@ -5,6 +5,12 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+
+  // Migrations need a session-level connection: they take advisory locks and run DDL,
+  // neither of which survives a transaction pooler like Neon's PgBouncer. So the app
+  // talks through the pooled URL and `prisma migrate deploy` uses the direct one.
+  // Locally both point at the same Postgres.
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 model User {

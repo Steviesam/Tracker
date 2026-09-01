@@ -439,15 +439,19 @@ Push to GitHub, GitLab or Bitbucket.
 
 ### 2. Create the database
 
-Sign up at [neon.tech](https://neon.tech), create a project, and copy the **pooled**
-connection string. It looks like:
+Sign up at [neon.tech](https://neon.tech), create a project, and copy **both** connection
+strings Neon offers. They differ only by `-pooler` in the host:
 
 ```
-postgresql://user:password@ep-xxx-pooler.region.aws.neon.tech/neondb?sslmode=require
+pooled:  postgresql://user:password@ep-xxx-pooler.region.aws.neon.tech/neondb?sslmode=require
+direct:  postgresql://user:password@ep-xxx.region.aws.neon.tech/neondb?sslmode=require
 ```
 
-Use the pooled one. Serverless functions open a connection per invocation, and a direct
-connection runs out of slots under any real traffic.
+Both are needed, for opposite reasons. The running app uses the pooled one, because
+serverless functions open a connection per invocation and a direct connection runs out of
+slots under any real traffic. Migrations use the direct one, because they take advisory
+locks and run DDL, and a transaction pooler drops both — `prisma migrate deploy` over the
+pooled URL hangs or fails with a lock error.
 
 ### 3. Generate a session secret
 
@@ -467,7 +471,8 @@ want preview deploys to work):
 
 | Variable | Value |
 | --- | --- |
-| `DATABASE_URL` | the Neon pooled connection string |
+| `DATABASE_URL` | the Neon **pooled** string — host has `-pooler` |
+| `DIRECT_DATABASE_URL` | the Neon **direct** string — same, without `-pooler` |
 | `APP_SESSION_SECRET` | the string from step 3 |
 | `MAX_UPLOAD_MB` | `4` — see the size limit below |
 | `YOUTUBE_API_KEY` | your Google Cloud key |
@@ -477,8 +482,12 @@ want preview deploys to work):
 | `APIFY_INSTAGRAM_REELS_ACTOR` | `apify~instagram-reel-scraper` |
 | `APIFY_INSTAGRAM_PROFILE_ACTOR` | `apify~instagram-profile-scraper` |
 
-`APP_SESSION_SECRET` and `DATABASE_URL` are the only required ones. The app starts without
-the rest; every metric simply reads `N/A` with the reason shown.
+`APP_SESSION_SECRET`, `DATABASE_URL` and `DIRECT_DATABASE_URL` are the required ones. The
+app starts without the rest; every metric simply reads `N/A` with the reason shown.
+
+Miss one of the required three and the build fails at `prisma migrate deploy` with
+`DATABASE_URL resolved to an empty string` — Vercel does not inherit anything from your
+local `.env`, which is never committed.
 
 ### 6. Deploy
 
