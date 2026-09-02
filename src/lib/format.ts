@@ -45,3 +45,37 @@ export function formatRupees(value: number | null): string {
   if (value === null || value === undefined) return "—";
   return `₹${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(value)}`;
 }
+
+/**
+ * Digits as a phone number a person can read back: `+91 98765 43210`, `98765 43210`.
+ *
+ * Storage keeps digits only, which is what `tel:` and WhatsApp want, but an unbroken
+ * `919876543210` is hard to check against a contact list — which is exactly what someone
+ * does before dialling a number they have not called before.
+ */
+export function formatPhone(digits: string): string {
+  if (digits.length === 12 && digits.startsWith("91")) {
+    const local = digits.slice(2);
+    return `+91 ${local.slice(0, 5)} ${local.slice(5)}`;
+  }
+  if (digits.length === 10) return `${digits.slice(0, 5)} ${digits.slice(5)}`;
+  return `+${digits}`;
+}
+
+/**
+ * A number without a country code is a domestic one, so `tel:` gets it as written — a
+ * leading `+` would send it abroad.
+ */
+export function telHref(digits: string): string {
+  return digits.length <= 10 ? `tel:${digits}` : `tel:+${digits}`;
+}
+
+/**
+ * WhatsApp has no domestic mode: every link needs a country code, so a bare ten-digit
+ * number has to be given one. India is the assumption everywhere else in this app — the
+ * prices are in rupees and the directory is filtered by Indian states — so it is the
+ * assumption here too. The stored number is left alone; only the link gets the prefix.
+ */
+export function whatsAppHref(digits: string): string {
+  return `https://wa.me/${digits.length <= 10 ? `91${digits}` : digits}`;
+}

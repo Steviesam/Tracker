@@ -98,6 +98,108 @@ function parse(raw: string | number): number | null {
   return Math.round(amount * scale);
 }
 
+/**
+ * Reads an email address out of a cell.
+ *
+ * Cells hold more than one often enough to matter ("a@b.com / manager@c.com", or an address
+ * with a name in front of it), so the first well-formed address wins rather than the cell
+ * being rejected whole. Lowercased, because the same person arrives capitalised differently
+ * on each sheet and two spellings of one address are worse than none.
+ */
+export function toEmail(raw: string): string | null {
+  const match = raw.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i);
+  return match ? match[0].toLowerCase() : null;
+}
+
+/**
+ * Reads a phone number, returning digits only with the country code when there was one.
+ *
+ * Sheets write the same number as "+91 98765 43210", "098765-43210", "9876543210" and
+ * "91 9876543210". They also write things that are not phone numbers at all in the phone
+ * column — "NA", a landline extension, a WhatsApp group link. The length bounds below are
+ * what separate the two: anything outside them is dropped rather than stored, because a
+ * `tel:` link to a broken number wastes more time than an empty field does.
+ *
+ * A leading zero is Indian trunk dialling and means nothing to a phone that is not on the
+ * domestic network, so it goes; the country code is kept exactly as given, and never
+ * invented, since a number saved under the wrong country dials a stranger.
+ */
+export function toPhone(raw: string): string | null {
+  const value = raw.trim();
+  if (!value) return null;
+
+  // An extension turns one number into two, and we cannot dial the second half anyway.
+  const first = value.split(/[,;/]|\bext\b|\bx\b/i)[0];
+  const digits = first.replace(/\D/g, "");
+  if (!digits) return null;
+
+  const trimmed = digits.replace(/^0+/, "");
+  // 10 is a bare Indian mobile; 15 is the international maximum under E.164.
+  if (trimmed.length < 10 || trimmed.length > 15) return null;
+
+  // All one digit is how "0000000000" and "9999999999" get typed to mean "no number".
+  if (/^(\d)\1+$/.test(trimmed)) return null;
+
+  return trimmed;
+}
+
+/**
+ * Above this, the cell is not a rate.
+ *
+ * A crore for one post is already far beyond what anyone in this directory charges, so a
+ * larger number is a mis-keyed cell — most often a phone number, which is exactly the shape
+ * that would otherwise sail through and overflow the column.
+ */
+const MAX_RATE = 10_00_00_000;
+
+const RUPEE_SCALE: Record<string, number> = {
+  k: 1_000,
+  l: 1_00_000,
+  lac: 1_00_000,
+  lakh: 1_00_000,
+  lakhs: 1_00_000,
+  m: 10_00_000,
+  cr: 1_00_00_000,
+  crore: 1_00_00_000,
+  crores: 1_00_00_000,
+};
+
+/**
+ * Parses what a creator charges, in whole rupees.
+ *
+ * Rate columns are written for humans: "₹50,000", "50k", "1.5 lakh", "50000/reel",
+ * "Rs. 25,000 per post". The number and its scale are what matter; the currency mark and
+ * whatever the rate is *per* are stripped, since the directory holds one price per creator
+ * and nothing downstream reads the unit.
+ *
+ * Returns null for anything unreadable rather than 0, which would read as "works for free".
+ */
+export function toRupees(raw: string | number): number | null {
+  if (typeof raw === "number") {
+    return Number.isFinite(raw) && raw > 0 && raw <= MAX_RATE ? Math.round(raw) : null;
+  }
+
+  const value = raw
+    .toLowerCase()
+    .replace(/[₹,]/g, "")
+    .replace(/\b(?:rs|inr)\b\.?\s*/g, " ")
+    // "per reel", "/post", "for 1 reel" — the unit, not the price.
+    .replace(/(per|\/|for)\s*\d*\s*[a-z]+/g, " ")
+    // Whatever prefix survived the two rules above. A rate column holds prices, and the
+    // words in front of one ("approx", "starting") do not change the number behind it.
+    .replace(/^[^\d]+/, "")
+    .trim();
+
+  const match = value.match(/^([0-9]*\.?[0-9]+)\s*(k|l|lac|lakhs?|m|cr|crores?)?\b/);
+  if (!match) return null;
+
+  const amount = Number(match[1]);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+
+  const scaled = Math.round(amount * (match[2] ? RUPEE_SCALE[match[2]] : 1));
+  return scaled > 0 && scaled <= MAX_RATE ? scaled : null;
+}
+
 /** Words kept lowercase mid-phrase, so "City Of Patna" does not out-shout the place name. */
 const MINOR_WORDS = new Set(["of", "and", "the", "in", "at", "de", "da"]);
 

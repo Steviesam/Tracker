@@ -195,4 +195,49 @@ describe("readCreators", () => {
     expect(records.map((record) => record.username)).toEqual(["good_handle"]);
     expect(summary.skippedNoUsername).toBe(2);
   });
+
+  it("reads contact details and an asking rate the way a sheet writes them", async () => {
+    const file = await workbook({
+      Data: [
+        ["INSTA", "NAME", "EMAIL ID", "CONTACT NUMBER", "RATE CARD"],
+        ["creator_one", "One", "One@Agency.IN", "+91 98765 43210", "₹50,000"],
+        ["creator_two", "Two", "two@agency.in", "09123456789", "1.5 lakh"],
+        ["creator_three", "Three", "", "", ""],
+      ],
+    });
+
+    const { records } = await readCreators(file, "contacts.xlsx");
+    const byName = new Map(records.map((record) => [record.username, record]));
+
+    expect(byName.get("creator_one")).toMatchObject({
+      email: "one@agency.in",
+      phone: "919876543210",
+      rateCard: 50_000,
+    });
+    expect(byName.get("creator_two")).toMatchObject({
+      phone: "9123456789",
+      rateCard: 1_50_000,
+    });
+    expect(byName.get("creator_three")).toMatchObject({
+      email: null,
+      phone: null,
+      rateCard: null,
+    });
+  });
+
+  it("keeps a contact cell it could not read, instead of losing what the sheet knew", async () => {
+    const file = await workbook({
+      Data: [
+        ["INSTA", "NAME", "CONTACT NUMBER", "RATE"],
+        ["creator_one", "One", "DM only", "negotiable"],
+      ],
+    });
+
+    const { records } = await readCreators(file, "unreadable.xlsx");
+
+    expect(records[0].phone).toBeNull();
+    expect(records[0].rateCard).toBeNull();
+    expect(records[0].notes).toContain("DM only");
+    expect(records[0].notes).toContain("negotiable");
+  });
 });

@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { looksLikeHeaderRow, mapColumns, normaliseHeader } from "@/lib/directory/columns";
 import { toNiches } from "@/lib/directory/niches";
-import { resolvePlace, toFollowers, toLabel, toUsername } from "@/lib/directory/normalise";
+import { formatPhone, telHref, whatsAppHref } from "@/lib/format";
+import {
+  resolvePlace,
+  toEmail,
+  toFollowers,
+  toLabel,
+  toPhone,
+  toRupees,
+  toUsername,
+} from "@/lib/directory/normalise";
 
 describe("toNiches", () => {
   it("splits a run-on cell so each category is its own filter option", () => {
@@ -154,9 +163,23 @@ describe("mapColumns", () => {
   });
 
   it("keeps unrecognised columns as extras rather than dropping them", () => {
-    const map = mapColumns(["Username", "Phone", "Agency"]);
+    const map = mapColumns(["Username", "Agency", "Preferred Language"]);
     expect(map.fields.username).toBe(0);
     expect(map.extras).toEqual([1, 2]);
+  });
+
+  it("binds the contact and rate columns a sheet is likely to carry", () => {
+    const map = mapColumns(["Insta", "Email ID", "Contact Number", "Rate Card"]);
+    expect(map.fields.email).toBe(1);
+    expect(map.fields.phone).toBe(2);
+    expect(map.fields.rateCard).toBe(3);
+    expect(map.extras).toEqual([]);
+  });
+
+  it("reads a bare 'Contact' column as a phone number, which is what it usually holds", () => {
+    // An address in such a column is dropped by toPhone rather than stored as a number,
+    // so guessing wrong here costs a field, not a wrong value.
+    expect(mapColumns(["Username", "Contact"]).fields.phone).toBe(1);
   });
 
   it("recognises the short spellings people actually type", () => {
@@ -278,5 +301,127 @@ describe("toLabel", () => {
   it("returns null for blanks", () => {
     expect(toLabel("")).toBeNull();
     expect(toLabel("   ")).toBeNull();
+  });
+});
+
+describe("toEmail", () => {
+  it("reads an address out of a cell that says more than the address", () => {
+    expect(toEmail("Priya <priya@agency.in>")).toBe("priya@agency.in");
+    expect(toEmail("mail: hello@studio.co.in")).toBe("hello@studio.co.in");
+  });
+
+  it("takes the first when a cell lists several, rather than rejecting the cell", () => {
+    expect(toEmail("a@b.com / manager@c.com")).toBe("a@b.com");
+  });
+
+  it("lowercases, so one address is not stored under two spellings", () => {
+    expect(toEmail("Priya.Sharma@Agency.IN")).toBe("priya.sharma@agency.in");
+  });
+
+  it("returns null for cells holding no address", () => {
+    expect(toEmail("")).toBeNull();
+    expect(toEmail("NA")).toBeNull();
+    expect(toEmail("dm on insta")).toBeNull();
+    expect(toEmail("priya@agency")).toBeNull();
+  });
+});
+
+describe("toPhone", () => {
+  it("reads one number out of the many ways a sheet writes it", () => {
+    expect(toPhone("9876543210")).toBe("9876543210");
+    expect(toPhone("+91 98765 43210")).toBe("919876543210");
+    expect(toPhone("098765-43210")).toBe("9876543210");
+    expect(toPhone("(+91) 98765.43210")).toBe("919876543210");
+  });
+
+  it("keeps the first number when a cell holds two", () => {
+    expect(toPhone("9876543210 / 9123456789")).toBe("9876543210");
+    expect(toPhone("9876543210, 9123456789")).toBe("9876543210");
+  });
+
+  it("drops an extension, which cannot be dialled from a link anyway", () => {
+    expect(toPhone("9876543210 ext 22")).toBe("9876543210");
+  });
+
+  it("refuses anything that is not a dialable number", () => {
+    expect(toPhone("")).toBeNull();
+    expect(toPhone("NA")).toBeNull();
+    expect(toPhone("dm only")).toBeNull();
+    // Too short to dial, and too long to be a real number.
+    expect(toPhone("12345")).toBeNull();
+    expect(toPhone("9876543210987654321")).toBeNull();
+  });
+
+  it("refuses the repeated digits people type to mean 'no number'", () => {
+    expect(toPhone("0000000000")).toBeNull();
+    expect(toPhone("9999999999")).toBeNull();
+  });
+});
+
+describe("toRupees", () => {
+  it("reads a rate written for a human", () => {
+    expect(toRupees("₹50,000")).toBe(50_000);
+    expect(toRupees("Rs. 25,000")).toBe(25_000);
+    expect(toRupees("50k")).toBe(50_000);
+    expect(toRupees("1.5 lakh")).toBe(1_50_000);
+    expect(toRupees("2 cr")).toBe(2_00_00_000);
+    expect(toRupees(40_000)).toBe(40_000);
+  });
+
+  it("ignores what the rate is per, since only the price is stored", () => {
+    expect(toRupees("50000/reel")).toBe(50_000);
+    expect(toRupees("₹25,000 per post")).toBe(25_000);
+  });
+
+  it("returns null rather than 0, which would read as 'works for free'", () => {
+    expect(toRupees("")).toBeNull();
+    expect(toRupees("negotiable")).toBeNull();
+    expect(toRupees("TBD")).toBeNull();
+    expect(toRupees(0)).toBeNull();
+  });
+
+  it("refuses a number too large to be a rate, which is how a phone number gets in", () => {
+    expect(toRupees("9876543210")).toBeNull();
+    expect(toRupees(9_876_543_210)).toBeNull();
+  });
+
+  it("keeps the price when the cell also mentions tax", () => {
+    expect(toRupees("16000 + gst")).toBe(16_000);
+    expect(toRupees("15,000 plus GST")).toBe(15_000);
+  });
+});
+
+describe("rate column names used by real agency sheets", () => {
+  it("recognises commercial, including the way it is usually misspelt", () => {
+    for (const header of ["COMMERCIAL", "Commerical", "Commercials"]) {
+      const map = mapColumns(["INSTA", header]);
+      expect(map.fields.rateCard, header).toBe(1);
+    }
+  });
+
+  it("takes the influencer price and leaves the brand price in notes", () => {
+    // Two columns, two different numbers: what the creator asks, and what we quote the
+    // brand. Storing the second as the rate card would put our margin on the creator.
+    const map = mapColumns(["INSTA", "INFL PRICE (S)", "BRAND PRICE (S)"]);
+    expect(map.fields.rateCard).toBe(1);
+    expect(map.extras).toContain(2);
+  });
+});
+
+describe("formatPhone", () => {
+  it("breaks up digits so a number can be checked against a contact list", () => {
+    expect(formatPhone("919876543210")).toBe("+91 98765 43210");
+    expect(formatPhone("9876543210")).toBe("98765 43210");
+  });
+
+  it("dials a bare number domestically and a prefixed one abroad", () => {
+    expect(telHref("9876543210")).toBe("tel:9876543210");
+    expect(telHref("919876543210")).toBe("tel:+919876543210");
+  });
+
+  it("gives WhatsApp a country code, since it has no domestic mode", () => {
+    expect(whatsAppHref("9876543210")).toBe("https://wa.me/919876543210");
+    expect(whatsAppHref("919876543210")).toBe("https://wa.me/919876543210");
+    expect(whatsAppHref("14155552671")).toBe("https://wa.me/14155552671");
   });
 });

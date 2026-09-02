@@ -19,6 +19,16 @@ export type DirectoryCreator = {
   followersSource: FollowersSource;
   /** ISO timestamp of the live lookup, so a card can say how stale the number is. */
   followersCheckedAt: string | null;
+  email: string | null;
+  /** Digits only, country code included when the sheet gave one. */
+  phone: string | null;
+  /**
+   * What the creator asks for a post, as the sheet has it.
+   *
+   * A starting price, not an agreement. What was actually settled on lives on the campaign,
+   * per campaign, because it changes every time.
+   */
+  rateCard: number | null;
   notes: string | null;
 };
 

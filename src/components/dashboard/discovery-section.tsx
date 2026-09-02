@@ -4,12 +4,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   IconCompass,
   IconFilter,
+  IconMail,
+  IconPhone,
   IconPin,
   IconRefresh,
   IconSearch,
   IconTag,
   IconUpload,
   IconUsers,
+  IconWallet,
+  IconWhatsApp,
 } from "@/components/icons";
 import {
   EMPTY_FILTERS,
@@ -25,7 +29,7 @@ import {
   type LiveFollowers,
   type SortKey,
 } from "@/lib/directory/types";
-import { formatMetric } from "@/lib/format";
+import { formatMetric, formatPhone, formatRupees, telHref, whatsAppHref } from "@/lib/format";
 
 const SORT_LABEL: Record<SortKey, string> = {
   followers: "Most followers",
@@ -341,7 +345,7 @@ export default function DiscoverySection({ onError }: Props) {
 
           <div className="card space-y-4 p-4">
             <div className="flex flex-wrap items-center gap-2">
-              <div className="relative min-w-[200px] flex-1 sm:max-w-sm">
+              <div className="relative w-full sm:min-w-[200px] sm:max-w-sm sm:flex-1">
                 <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   type="search"
@@ -353,7 +357,7 @@ export default function DiscoverySection({ onError }: Props) {
               </div>
 
               <select
-                className="field w-auto"
+                className="field flex-1 sm:w-auto sm:flex-none"
                 value={sort}
                 onChange={(event) => {
                   setSort(event.target.value as SortKey);
@@ -603,10 +607,81 @@ function CreatorCard({
             {niche}
           </span>
         ))}
-        {!place && creator.niches.length === 0 ? (
+        {/* What they ask for a post, as the sheet has it. */}
+        {creator.rateCard !== null ? (
+          <span
+            className="chip bg-amber-50 text-amber-700 ring-amber-200"
+            title="Asking price from your sheet"
+          >
+            <IconWallet className="h-3 w-3" />
+            {formatRupees(creator.rateCard)}
+          </span>
+        ) : null}
+        {!place && creator.niches.length === 0 && creator.rateCard === null ? (
           <span className="text-xs text-slate-400">No location or category in the sheet</span>
         ) : null}
       </div>
+
+      {/*
+        Contact, as three things you can actually press.
+
+        On a phone these open the dialer, the mail app and WhatsApp, which is the whole
+        point — the alternative is reading a number off the screen and typing it into
+        another app. Printed as text as well as linked, because the number is often what
+        someone wants to copy into a message they are already writing.
+
+        Taller than the chips above them on a phone. Those are labels; these are the only
+        things on the card meant to be tapped, and a 20px target is one a thumb misses.
+      */}
+      {creator.email || creator.phone ? (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-3">
+          {creator.email ? (
+            <a
+              className="chip max-w-full min-h-[34px] bg-white text-slate-600 ring-slate-200 hover:bg-slate-50 hover:text-slate-900 sm:min-h-0"
+              href={`mailto:${creator.email}`}
+              title={creator.email}
+            >
+              <IconMail className="h-3 w-3 shrink-0" />
+              <span className="truncate">{creator.email}</span>
+            </a>
+          ) : null}
+          {creator.phone ? (
+            <>
+              <a
+                className="chip min-h-[34px] bg-white text-slate-600 ring-slate-200 hover:bg-slate-50 hover:text-slate-900 sm:min-h-0"
+                href={telHref(creator.phone)}
+              >
+                <IconPhone className="h-3 w-3 shrink-0" />
+                {formatPhone(creator.phone)}
+              </a>
+              <a
+                className="chip min-h-[34px] bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100 sm:min-h-0"
+                href={whatsAppHref(creator.phone)}
+                target="_blank"
+                rel="noreferrer"
+                title="Open WhatsApp"
+              >
+                <IconWhatsApp className="h-3 w-3 shrink-0" />
+                WhatsApp
+              </a>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/*
+        Whatever the sheet said that no field could hold — a language, a remark, and the
+        rate cells that read "negotiable" or "DM only".
+
+        Those last ones are why this is on the card rather than only in the database. A
+        creator with no price chip otherwise looks like a creator nobody priced, when in
+        fact the sheet answered the question and the answer was "ask them".
+      */}
+      {creator.notes ? (
+        <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-slate-500" title={creator.notes}>
+          {creator.notes}
+        </p>
+      ) : null}
     </article>
   );
 }
@@ -784,7 +859,9 @@ function Chip({
     <button
       type="button"
       onClick={onClick}
-      className={`chip ${
+      // A chip is a label at rest and a button here, so on a phone it takes the height a
+      // finger needs rather than the height the text needs.
+      className={`chip px-3 py-1.5 text-[13px] sm:px-2 sm:py-0.5 sm:text-xs ${
         active
           ? "bg-slate-900 text-white ring-slate-900"
           : "bg-white text-slate-600 ring-slate-200 hover:bg-slate-50 hover:text-slate-900"

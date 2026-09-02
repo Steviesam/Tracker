@@ -248,8 +248,48 @@ generous set of spellings is accepted:
 | City | `City`, `Town`, `District`, `Location` |
 | Category | `Category`, `Niche`, `Genre`, `Vertical`, `Industry` |
 | Followers | `Followers`, `Follower Count`, `Audience Size`, `Reach` |
+| Email | `Email`, `Email ID`, `Mail`, `Business Email` |
+| Phone | `Phone`, `Mobile`, `Contact Number`, `WhatsApp`, `Contact` |
+| Rate | `Commercial`, `Commerical`, `Infl Price`, `Rate`, `Rate Card`, `Price`, `Charges`, `Per Reel` |
 
-Anything else — an agency column, a phone number — is kept in `notes` rather than dropped.
+Anything else — an agency column, a preferred language — is kept in `notes` rather than
+dropped.
+
+### Contact details and what a creator charges
+
+Both come from the sheet, and both show on the creator's card once imported.
+
+The email and the phone number are links, not text: on a phone they open the dialer, the
+mail app and WhatsApp, so a number never has to be read off one screen and typed into
+another. The number is stored as digits with the country code the sheet gave, which is what
+all three of those links need.
+
+A rate column is read as an opening price and shown as an amber chip. Sheets write prices
+for humans — `₹50,000`, `50k`, `1.5 lakh`, `50000/reel`, `16000 + gst` — so the currency
+mark, the tax note and whatever the rate is *per* are stripped and the number kept.
+
+Agency sheets usually head that column `COMMERCIAL` rather than anything with "rate" or
+"price" in it, and about as often spell it `Commerical`; both are matched. Where a sheet
+carries *two* prices — an influencer price and a brand price — the influencer price is the
+rate card. The brand price is what we quote on top, and putting our own margin on the
+creator's card would misprice every negotiation that followed, so it stays in notes.
+
+Three things are deliberately refused rather than stored:
+
+- **A phone number in the rate column.** Anything above a crore for one post is a mis-keyed
+  cell, and storing it would both overflow the column and put a fictional price on a
+  creator. The same guard exists on follower counts, for the same reason.
+- **A number too short or too long to dial**, and the `0000000000` / `9999999999` people
+  type to mean "no number". A `tel:` link to a broken number wastes more time than a blank
+  field does.
+- **`negotiable`, `TBD`, `DM only`.** These are not values, but they *are* what the sheet
+  knew, so they go to `notes` instead of being thrown away — and notes print on the card.
+  A creator with no price chip would otherwise look like one nobody priced, when the sheet
+  answered the question and the answer was "ask them".
+
+What a creator charges is separate from what any campaign agreed with them. The rate card is
+a starting price that belongs to the creator; the agreed rate belongs to the campaign, and
+changes with each one. Neither overwrites the other.
 
 ### Sheets that are not one clean table
 

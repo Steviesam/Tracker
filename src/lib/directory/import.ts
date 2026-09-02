@@ -7,7 +7,15 @@ import {
   type ColumnMap,
 } from "@/lib/directory/columns";
 import { toNiches } from "@/lib/directory/niches";
-import { resolvePlace, toFollowers, toLabel, toUsername } from "@/lib/directory/normalise";
+import {
+  resolvePlace,
+  toEmail,
+  toFollowers,
+  toLabel,
+  toPhone,
+  toRupees,
+  toUsername,
+} from "@/lib/directory/normalise";
 import type { ImportSummary } from "@/lib/directory/types";
 import { readSheets } from "@/lib/parse";
 
@@ -18,6 +26,9 @@ export type CreatorRecord = {
   city: string | null;
   niches: string[];
   followers: number | null;
+  email: string | null;
+  phone: string | null;
+  rateCard: number | null;
   notes: string | null;
 };
 
@@ -47,6 +58,14 @@ function toRecord(row: string[], columns: ColumnMap, tally: RowTally): CreatorRe
   const place = resolvePlace(cell(row, columns.fields.state), cell(row, columns.fields.city));
   if (place.stateDerived) tally.stateDerived();
 
+  const rawEmail = cell(row, columns.fields.email);
+  const rawPhone = cell(row, columns.fields.phone);
+  const rawRate = cell(row, columns.fields.rateCard);
+
+  const email = toEmail(rawEmail);
+  const phone = toPhone(rawPhone);
+  const rateCard = toRupees(rawRate);
+
   const notes = columns.extras
     .map((index) => {
       const value = cell(row, index);
@@ -55,6 +74,17 @@ function toRecord(row: string[], columns: ColumnMap, tally: RowTally): CreatorRe
       return header ? `${header}: ${value}` : value;
     })
     .filter((entry): entry is string => entry !== null)
+    // A contact column that held something we could not read — a landline with an
+    // extension, "DM only", a rate written as "negotiable" — is still what the sheet knew
+    // about this creator. It goes to notes rather than being thrown away, because the
+    // alternative is a blank field and no way to find out why.
+    .concat(
+      [
+        rawEmail && !email ? `Email: ${rawEmail}` : null,
+        rawPhone && !phone ? `Phone: ${rawPhone}` : null,
+        rawRate && rateCard === null ? `Rate: ${rawRate}` : null,
+      ].filter((entry): entry is string => entry !== null),
+    )
     .join(" · ");
 
   return {
@@ -64,6 +94,9 @@ function toRecord(row: string[], columns: ColumnMap, tally: RowTally): CreatorRe
     city: place.city,
     niches: toNiches(cell(row, columns.fields.niche)),
     followers,
+    email,
+    phone,
+    rateCard,
     notes: notes.length > 0 ? notes.slice(0, 500) : null,
   };
 }
@@ -164,7 +197,7 @@ export async function readCreators(
 
 /**
  * Rows per statement. Postgres caps a query at 65,535 bind parameters, and each row here
- * binds nine, so 500 leaves ample headroom while keeping a 10,000-row import to 20 round
+ * binds twelve, so 500 leaves ample headroom while keeping a 10,000-row import to 20 round
  * trips rather than 10,000.
  */
 const CHUNK = 500;
@@ -200,6 +233,9 @@ export async function upsertCreators(
             ${record.niches},
             ${record.followers},
             ${record.followers === null ? null : "sheet"},
+            ${record.email},
+            ${record.phone},
+            ${record.rateCard},
             ${record.notes},
             ${sourceFile},
             NOW(),
@@ -210,7 +246,8 @@ export async function upsertCreators(
         written += await tx.$executeRaw`
           INSERT INTO "Creator" (
             "id", "username", "displayName", "state", "city",
-            "niches", "followers", "followersSource", "notes", "sourceFile",
+            "niches", "followers", "followersSource",
+            "email", "phone", "rateCard", "notes", "sourceFile",
             "createdAt", "updatedAt"
           )
           VALUES ${Prisma.join(values)}
@@ -234,6 +271,12 @@ export async function upsertCreators(
                               WHEN EXCLUDED."followers" IS NOT NULL THEN 'sheet'
                               ELSE "Creator"."followersSource"
                             END,
+            -- Contact details and the asking price follow the same rule as the rest: a
+            -- sheet without the column leaves what we already knew alone, and a sheet with
+            -- it is the newer answer.
+            "email"       = COALESCE(EXCLUDED."email",       "Creator"."email"),
+            "phone"       = COALESCE(EXCLUDED."phone",       "Creator"."phone"),
+            "rateCard"    = COALESCE(EXCLUDED."rateCard",    "Creator"."rateCard"),
             "notes"       = COALESCE(EXCLUDED."notes",       "Creator"."notes"),
             "sourceFile"  = EXCLUDED."sourceFile",
             "updatedAt"   = NOW()

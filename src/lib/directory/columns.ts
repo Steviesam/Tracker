@@ -5,7 +5,16 @@
  * single spelling. Whatever cannot be mapped is kept as notes rather than dropped.
  */
 
-export type CreatorField = "username" | "displayName" | "state" | "city" | "niche" | "followers";
+export type CreatorField =
+  | "username"
+  | "displayName"
+  | "state"
+  | "city"
+  | "niche"
+  | "followers"
+  | "email"
+  | "phone"
+  | "rateCard";
 
 export const CREATOR_FIELDS: CreatorField[] = [
   "username",
@@ -14,6 +23,9 @@ export const CREATOR_FIELDS: CreatorField[] = [
   "city",
   "niche",
   "followers",
+  "email",
+  "phone",
+  "rateCard",
 ];
 
 export const FIELD_LABEL: Record<CreatorField, string> = {
@@ -23,6 +35,9 @@ export const FIELD_LABEL: Record<CreatorField, string> = {
   city: "City",
   niche: "Category / niche",
   followers: "Followers",
+  email: "Email",
+  phone: "Phone",
+  rateCard: "Rate",
 };
 
 /**
@@ -100,6 +115,80 @@ const ALIASES: Record<CreatorField, string[]> = {
     "audience size",
     "audience",
     "reach",
+  ],
+  email: [
+    "email",
+    "email id",
+    "email address",
+    "e mail",
+    "mail",
+    "mail id",
+    "contact email",
+    "business email",
+    "official email",
+  ],
+  /**
+   * "contact" and "contact details" sit here rather than under `email` because in Indian
+   * sheets an unqualified contact column is a mobile number far more often than an address
+   * — and `toPhone` returns null on anything that is not one, so a stray address is dropped
+   * rather than stored as a number.
+   */
+  phone: [
+    "phone",
+    "phone number",
+    "phone no",
+    "mobile",
+    "mobile number",
+    "mobile no",
+    "contact number",
+    "contact no",
+    "contact",
+    "contact details",
+    "whatsapp",
+    "whatsapp number",
+    "whatsapp no",
+    "number",
+  ],
+  /**
+   * "commercial" is how agency sheets usually head the price column, and "commerical" is
+   * how it is usually spelt — both appear in real sheets often enough to be worth matching.
+   *
+   * A brand price column is deliberately absent. Where a sheet carries both, the influencer
+   * price is what the creator asks and the brand price is what we quote on top; storing the
+   * second as the rate card would put our margin on the creator's card and misprice every
+   * negotiation from then on. It stays in notes, where it is visible but not mistaken for
+   * the creator's own number.
+   */
+  rateCard: [
+    "rate",
+    "rate card",
+    "rates",
+    "price",
+    "pricing",
+    "commercial",
+    "commercials",
+    "commerical",
+    "infl price",
+    "infl price s",
+    "influencer price",
+    "creator price",
+    "charges",
+    "charge",
+    "cost",
+    "fee",
+    "fees",
+    "amount",
+    "budget",
+    "quote",
+    "quotation",
+    "per post",
+    "per reel",
+    "reel rate",
+    "reel price",
+    "post rate",
+    "post price",
+    "story rate",
+    "asking price",
   ],
 };
 

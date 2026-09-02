@@ -117,6 +117,22 @@ model Creator {
   /// When the live lookup ran. Null while the count is still the sheet's.
   followersCheckedAt DateTime?
 
+  /// Lowercased. The first readable address when a cell holds several.
+  email String?
+
+  /// Digits only, with the country code when the sheet gave one: `919876543210`. Stored
+  /// bare so a `tel:`, a `wa.me` link and a copy-paste into a phone all work from one value.
+  phone String?
+
+  /**
+   * What the creator asks for a post, in whole rupees, as written in the sheet.
+   *
+   * This is a starting price, not an agreement: what was actually settled on lives on the
+   * campaign, per campaign, because it changes every time. Kept separate for that reason —
+   * overwriting it from a campaign would lose the number the sheet was maintained with.
+   */
+  rateCard Int?
+
   /// Free-text extras from the sheet that do not map to a column, kept so nothing is lost.
   notes String?
 
