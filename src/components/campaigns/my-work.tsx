@@ -73,8 +73,9 @@ export default function MyWorkPanel({ work, onOpenCampaign, onComplete, busy }: 
               key={task.id}
               className="group flex flex-wrap items-center gap-3 px-4 py-2.5 transition-colors hover:bg-slate-50/70"
             >
+              {/* Same trick as the task list: the square stays 18px, the target does not. */}
               <button
-                className="grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[6px] border border-slate-300 bg-white text-transparent transition hover:border-emerald-500 hover:bg-emerald-500 hover:text-white disabled:opacity-40"
+                className="relative grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[6px] border border-slate-300 bg-white text-transparent transition before:absolute before:-inset-2.5 before:content-[''] hover:border-emerald-500 hover:bg-emerald-500 hover:text-white disabled:opacity-40"
                 disabled={busy}
                 title="Mark done"
                 aria-label={`Mark ${task.name} done`}
@@ -83,17 +84,19 @@ export default function MyWorkPanel({ work, onOpenCampaign, onComplete, busy }: 
                 <IconCheck className="h-3 w-3" />
               </button>
 
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-medium leading-tight">{task.name}</p>
+              {/* First line to the task, second to the campaign and the date — a phone has
+                  no room for all three side by side and the name is the one you read. */}
+              <div className="w-[calc(100%-1.875rem)] flex-none sm:w-auto sm:min-w-0 sm:flex-1">
+                <p className="text-[13px] font-medium leading-tight sm:truncate">{task.name}</p>
                 <button
-                  className="mt-0.5 truncate text-[12px] leading-tight text-slate-500 transition-colors hover:text-indigo-600"
+                  className="mt-0.5 block max-w-full truncate text-left text-[12px] leading-tight text-slate-500 transition-colors hover:text-indigo-600"
                   onClick={() => onOpenCampaign(task.campaign.id)}
                 >
                   {task.campaign.name}
                 </button>
               </div>
 
-              <span className="flex items-center gap-1.5 text-xs">
+              <span className="ml-[1.875rem] flex items-center gap-1.5 text-xs sm:ml-0">
                 {task.state === "OVERDUE" ? (
                   <IconAlert className="h-3.5 w-3.5 text-rose-500" />
                 ) : null}

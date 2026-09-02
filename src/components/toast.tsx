@@ -47,7 +47,9 @@ export default function Toast({
   return (
     <div
       role={good ? "status" : "alert"}
-      className={`animate-rise fixed bottom-5 right-5 z-50 flex max-w-sm items-start gap-3 rounded-xl border bg-white p-3.5 pr-3 shadow-xl ${
+      // Above the phone's tab bar, and across the full width there: a card floating in the
+      // corner of a 390px screen is either cramped or covering the thing it is about.
+      className={`animate-rise fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-50 flex items-start gap-3 rounded-xl border bg-white p-3.5 pr-3 shadow-xl sm:inset-x-auto sm:bottom-5 sm:right-5 sm:max-w-sm ${
         good ? "border-emerald-200/80" : "border-rose-200/80"
       }`}
     >

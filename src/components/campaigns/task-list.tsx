@@ -83,7 +83,7 @@ export default function TaskList({
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <input
-            className="field min-w-[180px] flex-1"
+            className="field w-full sm:min-w-[180px] sm:flex-1"
             placeholder="Chase the brand for approval"
             value={name}
             onChange={(event) => setName(event.target.value)}
@@ -92,7 +92,7 @@ export default function TaskList({
             }}
           />
           <select
-            className="field w-auto"
+            className="field flex-1 sm:w-auto sm:flex-none"
             value={assignedToId}
             aria-label="Assign to"
             onChange={(event) => setAssignedToId(event.target.value)}
@@ -105,14 +105,14 @@ export default function TaskList({
             ))}
           </select>
           <input
-            className="field w-auto"
+            className="field flex-1 sm:w-auto sm:flex-none"
             type="date"
             value={dueDate}
             aria-label="Due date"
             onChange={(event) => setDueDate(event.target.value)}
           />
           <button
-            className="btn-primary"
+            className="btn-primary w-full sm:w-auto"
             disabled={busy || name.trim().length === 0}
             onClick={() => void add()}
           >
@@ -210,8 +210,10 @@ function TaskGroup({
                 key={task.id}
                 className="group flex flex-wrap items-center gap-3 px-4 py-2.5 transition-colors hover:bg-slate-50/70"
               >
+                {/* An 18px square is the right size to look at and the wrong size to hit, so
+                    the box a finger lands on is grown invisibly around it. */}
                 <button
-                  className={`grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[6px] border transition ${
+                  className={`relative grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[6px] border transition before:absolute before:-inset-2.5 before:content-[''] ${
                     finished
                       ? "border-emerald-500 bg-emerald-500 text-white"
                       : "border-slate-300 bg-white text-transparent hover:border-emerald-500 hover:bg-emerald-500 hover:text-white"
@@ -223,8 +225,11 @@ function TaskGroup({
                   <IconCheck className="h-3 w-3" />
                 </button>
 
+                {/* The name takes the rest of the first line on a phone (the 1.875rem is the
+                    checkbox and its gap), which pushes who and when onto a second line
+                    rather than squeezing all three into 390px. */}
                 <span
-                  className={`min-w-0 flex-1 truncate text-[13px] ${
+                  className={`w-[calc(100%-1.875rem)] flex-none text-[13px] sm:w-auto sm:min-w-0 sm:flex-1 sm:truncate ${
                     finished ? "text-slate-400 line-through" : ""
                   }`}
                 >
@@ -232,22 +237,25 @@ function TaskGroup({
                 </span>
 
                 {task.assignedTo ? (
-                  <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+                  <span className="ml-[1.875rem] inline-flex items-center gap-1.5 text-xs text-slate-500 sm:ml-0">
                     <Avatar name={task.assignedTo.name} className="h-4 w-4 text-[9px] leading-none" />
                     {task.assignedTo.name}
                   </span>
                 ) : (
-                  <span className="text-xs text-slate-400">Unassigned</span>
+                  <span className="ml-[1.875rem] text-xs text-slate-400 sm:ml-0">Unassigned</span>
                 )}
 
                 <span className="text-xs">
                   <DueDate iso={task.dueDate} done={finished} />
                 </span>
 
+                <span className="flex-1 sm:hidden" />
+
                 {/* Hidden until the row is under the cursor: a column of bins invites the
-                    one click on this screen that cannot be undone. */}
+                    one click on this screen that cannot be undone. There is no cursor on a
+                    phone, though, so hiding it there would hide it for good. */}
                 <button
-                  className="rounded p-1 text-slate-300 opacity-0 transition hover:bg-rose-50 hover:text-rose-600 focus-visible:opacity-100 group-hover:opacity-100"
+                  className="rounded p-2 text-slate-300 transition hover:bg-rose-50 hover:text-rose-600 focus-visible:opacity-100 lg:p-1 lg:opacity-0 lg:group-hover:opacity-100"
                   disabled={busy}
                   aria-label={`Delete ${task.name}`}
                   onClick={() => onDelete(task)}

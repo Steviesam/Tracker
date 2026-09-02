@@ -146,7 +146,7 @@ export default function CampaignsSection({
         />
       ) : (
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[200px] flex-1">
+          <div className="relative w-full sm:min-w-[200px] sm:flex-1">
             <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               className="field pl-9"
@@ -157,7 +157,7 @@ export default function CampaignsSection({
           </div>
 
           <select
-            className="field w-auto"
+            className="field flex-1 sm:w-auto sm:flex-none"
             value={status}
             onChange={(event) => setStatus(event.target.value as CampaignStatus | "")}
           >
@@ -169,7 +169,7 @@ export default function CampaignsSection({
             ))}
           </select>
 
-          <button className="btn-primary" onClick={() => setCreating(true)}>
+          <button className="btn-primary flex-1 sm:flex-none" onClick={() => setCreating(true)}>
             <IconPlus className="h-4 w-4" />
             New campaign
           </button>

@@ -140,7 +140,7 @@ export default function InfluencerRows({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <div className="segment">
+        <div className="segment rail w-full max-w-full overflow-x-auto sm:w-auto">
           {LENSES.filter((item) => canSeeMoney || !item.money).map((item) => (
             <button
               key={item.id}
@@ -153,7 +153,7 @@ export default function InfluencerRows({
         </div>
 
         <select
-          className="field field-sm w-auto"
+          className="field field-sm w-full sm:w-auto"
           value={stage}
           aria-label="Filter by stage"
           onChange={(event) => setStage(event.target.value as InfluencerStatus | "")}
@@ -166,7 +166,9 @@ export default function InfluencerRows({
           ))}
         </select>
 
-        <div className="relative min-w-[140px] flex-1">
+        {/* Its own line on a phone: a search box sharing a row with two dropdowns ends up
+            too narrow to read what you typed. */}
+        <div className="relative w-full sm:min-w-[140px] sm:flex-1">
           <IconSearch className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
           <input
             className="field field-sm pl-8"
@@ -228,24 +230,32 @@ export default function InfluencerRows({
             {shown.map((row) => (
               <li key={row.id} className={expanded === row.id ? "bg-slate-50/50" : ""}>
                 {/*
-                  Fixed tracks rather than a flex row: with flex, a long payment badge on one
-                  line pushed the follower and engagement figures out of line with the row
-                  above, and a column you cannot run your eye down is not a column.
+                  A card on a phone and a table row from `lg` up, from one set of markup.
+
+                  Squeezing the table into 390px was the version that failed: the name shared
+                  its line with a payment badge and a stage picker, lost the argument, and
+                  truncated to nothing — a row of creators you could not tell apart. Stacked,
+                  the name gets the full width, the figures sit under it as a sentence, and
+                  the stage picker becomes something you can hit.
+
+                  From `lg` the fixed tracks come back. With flex, a long badge on one line
+                  pushed the figures out of line with the row above, and a column you cannot
+                  run your eye down is not a column.
                 */}
                 <div
-                  className={`grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 px-4 py-2.5 transition-colors hover:bg-slate-50/70 ${
+                  className={`px-4 py-3 transition-colors hover:bg-slate-50/70 lg:grid lg:items-center lg:gap-x-4 lg:py-2.5 ${
                     canSeeMoney
                       ? "lg:grid-cols-[minmax(0,1fr)_5rem_5rem_10.5rem_9.5rem_1rem]"
                       : "lg:grid-cols-[minmax(0,1fr)_5rem_5rem_9.5rem_1rem]"
                   }`}
                 >
                   <button
-                    className="flex min-w-0 items-center gap-2.5 text-left"
+                    className="flex w-full min-w-0 items-center gap-2.5 text-left"
                     aria-expanded={expanded === row.id}
                     onClick={() => setExpanded(expanded === row.id ? null : row.id)}
                   >
                     <Avatar name={row.displayName || row.handle} />
-                    <span className="min-w-0">
+                    <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-1.5 truncate text-[13px] font-medium">
                         {displayHandle(row.platform, row.handle)}
                         {row.overdue ? <IconAlert className="h-3.5 w-3.5 text-rose-500" /> : null}
@@ -261,7 +271,38 @@ export default function InfluencerRows({
                         {row.assignedTo ? ` · ${row.assignedTo.name}` : ""}
                       </span>
                     </span>
+                    <IconChevron
+                      className={`h-4 w-4 shrink-0 text-slate-300 transition-transform lg:hidden ${
+                        expanded === row.id ? "rotate-180" : ""
+                      }`}
+                    />
                   </button>
+
+                  {/* The same two figures the table gives its own columns, written as a line
+                      because there is no room for columns and no need for them at one row. */}
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 pl-[42px] text-[12px] text-slate-500 lg:hidden">
+                    <span className="tabular-nums">
+                      <span className="font-medium text-slate-700">
+                        {formatMetric(row.followers)}
+                      </span>{" "}
+                      followers
+                    </span>
+                    {row.engagementRate === null ? null : (
+                      <span className="tabular-nums">
+                        <span className="font-medium text-slate-700">
+                          {formatPercent(row.engagementRate)}
+                        </span>{" "}
+                        engagement
+                      </span>
+                    )}
+                    {row.payment && row.payment !== "NO_RATE" ? (
+                      <PaymentBadge
+                        state={row.payment}
+                        agreedRate={row.agreedRate}
+                        amountPaid={row.amountPaid ?? 0}
+                      />
+                    ) : null}
+                  </div>
 
                   <div className="hidden text-right lg:block">
                     <p className="text-[13px] font-medium tabular-nums text-slate-700">
@@ -289,38 +330,24 @@ export default function InfluencerRows({
                     <div className="hidden lg:block" />
                   ) : null}
 
-                  <div className="flex items-center gap-2 justify-self-end">
-                    {/* Below the grid breakpoint the badge has nowhere of its own, so it rides
-                        alongside the stage picker instead of disappearing. */}
-                    {row.payment && row.payment !== "NO_RATE" ? (
-                      <span className="lg:hidden">
-                        <PaymentBadge
-                          state={row.payment}
-                          agreedRate={row.agreedRate}
-                          amountPaid={row.amountPaid ?? 0}
-                        />
-                      </span>
-                    ) : null}
-
-                    <select
-                      className="field field-sm w-auto lg:w-full"
-                      value={row.status}
-                      disabled={busy}
-                      aria-label={`Stage for ${row.handle}`}
-                      onChange={(event) =>
-                        void patch({
-                          influencerId: row.id,
-                          status: event.target.value as InfluencerStatus,
-                        })
-                      }
-                    >
-                      {INFLUENCER_STATUSES.map((value) => (
-                        <option key={value} value={value}>
-                          {INFLUENCER_STATUS_LABEL[value]}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <select
+                    className="field field-sm mt-2.5 w-full lg:mt-0 lg:w-auto lg:justify-self-end"
+                    value={row.status}
+                    disabled={busy}
+                    aria-label={`Stage for ${row.handle}`}
+                    onChange={(event) =>
+                      void patch({
+                        influencerId: row.id,
+                        status: event.target.value as InfluencerStatus,
+                      })
+                    }
+                  >
+                    {INFLUENCER_STATUSES.map((value) => (
+                      <option key={value} value={value}>
+                        {INFLUENCER_STATUS_LABEL[value]}
+                      </option>
+                    ))}
+                  </select>
 
                   <IconChevron
                     className={`hidden h-4 w-4 shrink-0 text-slate-300 transition-transform lg:block ${

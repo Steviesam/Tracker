@@ -126,7 +126,7 @@ export default function AccessSection({ email, onError }: Props) {
 
         <div className="mt-3 flex flex-wrap gap-2">
           <input
-            className="field flex-1"
+            className="field w-full sm:flex-1"
             type="email"
             placeholder="name@example.com"
             value={input}
@@ -136,7 +136,11 @@ export default function AccessSection({ email, onError }: Props) {
               if (event.key === "Enter") void add();
             }}
           />
-          <button className="btn-primary" disabled={busy || input.trim().length === 0} onClick={() => void add()}>
+          <button
+            className="btn-primary w-full sm:w-auto"
+            disabled={busy || input.trim().length === 0}
+            onClick={() => void add()}
+          >
             {busy ? <IconRefresh className="h-4 w-4 animate-spin" /> : null}
             Invite
             <IconArrow className="h-4 w-4" />

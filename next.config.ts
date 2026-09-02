@@ -7,9 +7,10 @@ const nextConfig: NextConfig = {
   // This app sits next to another project with its own lockfile; pin the root so Next
   // does not infer the parent directory.
   outputFileTracingRoot: path.join(__dirname),
-  // Development only, but the badge's default corner sits on top of the sidebar's account
-  // row, which makes it impossible to click while working on the app.
-  devIndicators: { position: "bottom-right" },
+  // Development only. Every corner covers something: the default sits on the sidebar's
+  // account row, and the bottom right is now the phone's tab bar. Top left costs a page
+  // title, which is the only one of the three you do not have to click.
+  devIndicators: { position: "top-left" },
 };
 
 export default nextConfig;

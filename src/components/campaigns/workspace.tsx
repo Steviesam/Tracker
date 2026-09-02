@@ -184,10 +184,12 @@ export default function CampaignWorkspace({
       </button>
 
       <div className="card overflow-hidden">
-        <div className="flex flex-wrap items-start justify-between gap-3 p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3 p-4 sm:p-5">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2.5">
-              <h2 className="text-[22px] font-semibold leading-tight">{campaign.name}</h2>
+              <h2 className="text-[19px] font-semibold leading-tight sm:text-[22px]">
+                {campaign.name}
+              </h2>
               <CampaignBadge status={campaign.status} />
             </div>
 
@@ -214,9 +216,9 @@ export default function CampaignWorkspace({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
             <select
-              className="field w-auto py-1.5 text-[13px]"
+              className="field field-sm flex-1 sm:w-auto sm:flex-none sm:py-1.5 sm:text-[13px]"
               value={campaign.status}
               disabled={busy}
               aria-label="Campaign status"
@@ -256,7 +258,7 @@ export default function CampaignWorkspace({
           </div>
         </div>
 
-        <div className="border-t border-slate-100 bg-slate-50/60 px-5 py-3">
+        <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-3 sm:px-5">
           <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-2 text-xs">
             <span className="text-slate-500">
               {counts.influencers.total === 0 && counts.tasks.total === 0
@@ -277,7 +279,7 @@ export default function CampaignWorkspace({
 
       {/* Underlined tabs rather than a segmented box: this is navigation within a page, and
           a grey pill tray competes with the toolbars that sit under it. */}
-      <div className="-mb-px flex gap-5 overflow-x-auto border-b border-slate-200">
+      <div className="rail -mb-px flex gap-5 overflow-x-auto border-b border-slate-200">
         {TABS.map((item) => {
           const count =
             item.id === "influencers"
@@ -289,7 +291,7 @@ export default function CampaignWorkspace({
           return (
             <button
               key={item.id}
-              className={`-mb-px shrink-0 border-b-2 px-0.5 pb-2.5 text-[13px] font-medium transition-colors ${
+              className={`-mb-px shrink-0 border-b-2 px-0.5 pb-2.5 pt-1 text-[13px] font-medium transition-colors ${
                 tab === item.id
                   ? "border-indigo-600 text-indigo-700"
                   : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800"
@@ -440,6 +442,9 @@ export default function CampaignWorkspace({
                 </button>
               ) : null}
             </div>
+            {/* In the list below, the task name gets the line to itself under `sm`, with who
+                and when beneath it: sharing one line left "Probe Rel…" and a date, which is
+                the two least useful thirds of the row. */}
             {open.length === 0 ? (
               <p className="px-4 py-9 text-center text-[13px] text-slate-500">
                 Nothing outstanding. Tasks appear here as influencers move through their
@@ -450,20 +455,24 @@ export default function CampaignWorkspace({
                 {open.slice(0, 5).map((task) => (
                   <li
                     key={task.id}
-                    className="flex flex-wrap items-center gap-3 px-4 py-2.5 transition-colors hover:bg-slate-50/70"
+                    className="px-4 py-2.5 transition-colors hover:bg-slate-50/70 sm:flex sm:flex-wrap sm:items-center sm:gap-3"
                   >
-                    <span className="min-w-0 flex-1 truncate text-[13px]">{task.name}</span>
-                    {task.assignedTo ? (
-                      <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
-                        <Avatar
-                          name={task.assignedTo.name}
-                          className="h-4 w-4 text-[9px] leading-none"
-                        />
-                        {task.assignedTo.name}
+                    <span className="block truncate text-[13px] sm:min-w-0 sm:flex-1">
+                      {task.name}
+                    </span>
+                    <span className="mt-1 flex items-center gap-3 sm:mt-0 sm:contents">
+                      {task.assignedTo ? (
+                        <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+                          <Avatar
+                            name={task.assignedTo.name}
+                            className="h-4 w-4 text-[9px] leading-none"
+                          />
+                          {task.assignedTo.name}
+                        </span>
+                      ) : null}
+                      <span className="text-xs">
+                        <DueDate iso={task.dueDate} />
                       </span>
-                    ) : null}
-                    <span className="text-xs">
-                      <DueDate iso={task.dueDate} />
                     </span>
                   </li>
                 ))}

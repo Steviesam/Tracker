@@ -26,6 +26,16 @@ const PLATFORM_DOT: Record<Platform, string> = {
   FACEBOOK: "bg-blue-600",
 };
 
+const SORT_OPTIONS: Array<{ key: SortKey; label: string }> = [
+  { key: "views", label: "Views" },
+  { key: "likes", label: "Likes" },
+  { key: "comments", label: "Comments" },
+  { key: "shares", label: "Shares" },
+  { key: "creator", label: "Creator" },
+  { key: "platform", label: "Platform" },
+  { key: "postedAt", label: "Date posted" },
+];
+
 const PAGE_SIZE = 25;
 
 export default function ResultsTable({ results }: { results: LinkResult[] }) {
@@ -107,7 +117,7 @@ export default function ResultsTable({ results }: { results: LinkResult[] }) {
   return (
     <div className="card overflow-hidden">
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 p-3">
-        <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
+        <div className="relative w-full sm:min-w-[200px] sm:max-w-xs sm:flex-1">
           <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             type="search"
@@ -153,7 +163,108 @@ export default function ResultsTable({ results }: { results: LinkResult[] }) {
         </span>
       </div>
 
-      <div className="overflow-x-auto">
+      {/* Sorting lives in the column headers, and the cards below have no headers — so on a
+          phone it needs somewhere else to live. */}
+      <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2 lg:hidden">
+        <label className="label shrink-0" htmlFor="results-sort">
+          Sort
+        </label>
+        <select
+          id="results-sort"
+          className="field field-sm flex-1"
+          value={sortKey}
+          onChange={(event) => {
+            setSortKey(event.target.value as SortKey);
+            setPage(0);
+          }}
+        >
+          {SORT_OPTIONS.map((option) => (
+            <option key={option.key} value={option.key}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <button
+          className="btn-secondary btn-sm"
+          aria-label={ascending ? "Sort highest first" : "Sort lowest first"}
+          onClick={() => setAscending((value) => !value)}
+        >
+          {ascending ? "Lowest first" : "Highest first"}
+        </button>
+      </div>
+
+      {/*
+        Cards on a phone, the table from `lg` up.
+
+        The table is 960px at its narrowest — eight columns of figures do not compress — so
+        on a 390px screen it became a panel you dragged sideways, one column at a time, with
+        the creator's name scrolled off before you reached the views. The same eight facts
+        stack into a card and stay readable.
+      */}
+      <ul className="divide-y divide-slate-100 lg:hidden">
+        {rows.map((result) => (
+          <li key={result.id} className="group px-4 py-3">
+            <div className="flex items-center gap-2">
+              <span className={`chip ring-1 ring-inset ${PLATFORM_STYLE[result.platform]}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${PLATFORM_DOT[result.platform]}`} />
+                {PLATFORM_LABEL[result.platform]}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-slate-700">
+                {result.creator ?? <NA reason={result.note} />}
+              </span>
+              {result.postedAt ? (
+                <span className="shrink-0 text-xs tabular-nums text-slate-400">
+                  {result.postedAt.slice(0, 10)}
+                </span>
+              ) : null}
+            </div>
+
+            <div className="mt-1.5 flex items-center gap-1.5">
+              <a
+                href={result.canonicalUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="min-w-0 flex-1 truncate text-[13px] text-slate-500 underline-offset-2 hover:text-indigo-600 hover:underline"
+              >
+                {result.canonicalUrl.replace(/^https?:\/\/(www\.)?/, "")}
+              </a>
+              <CopyButton url={result.canonicalUrl} />
+            </div>
+
+            {result.title ? (
+              <p className="mt-1 line-clamp-2 text-xs text-slate-400">{result.title}</p>
+            ) : null}
+
+            <div className="mt-2.5 grid grid-cols-4 gap-2">
+              {METRIC_COLUMNS.map((column) => {
+                const value = result.metrics[column.key as keyof typeof result.metrics];
+                return (
+                  <div key={column.key} className="rounded-lg bg-slate-50 px-2 py-1.5">
+                    <p className="text-[10px] uppercase tracking-[0.05em] text-slate-400">
+                      {column.label}
+                    </p>
+                    <p className="text-[13px] font-medium tabular-nums text-slate-800">
+                      {value === null ? <NA reason={result.note} /> : formatMetric(value)}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {result.note ? (
+              <p className="mt-2 text-xs leading-snug text-amber-600">{result.note}</p>
+            ) : null}
+          </li>
+        ))}
+
+        {rows.length === 0 ? (
+          <li className="px-4 py-12 text-center text-sm text-slate-500">
+            No links match this filter.
+          </li>
+        ) : null}
+      </ul>
+
+      <div className="hidden overflow-x-auto lg:block">
         <table className="w-full min-w-[960px] text-sm">
           <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
             <tr className="border-b border-slate-200 text-left">
@@ -324,10 +435,12 @@ function CopyButton({ url }: { url: string }) {
       type="button"
       aria-label={copied ? "Copied" : "Copy link"}
       title={copied ? "Copied" : "Copy link"}
+      // Revealed on hover at desk widths, always there on a phone, where there is no hover
+      // to reveal it with.
       className={`shrink-0 rounded p-1 transition-all ${
         copied
           ? "text-emerald-600 opacity-100"
-          : "text-slate-400 opacity-0 hover:text-slate-900 focus-visible:opacity-100 group-hover:opacity-100"
+          : "text-slate-400 hover:text-slate-900 focus-visible:opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
       }`}
       onClick={() => {
         void navigator.clipboard
@@ -363,7 +476,7 @@ function FilterChip({
     <button
       type="button"
       onClick={onClick}
-      className={`chip ${
+      className={`chip px-3 py-1.5 text-[13px] sm:px-2 sm:py-0.5 sm:text-xs ${
         active
           ? "bg-slate-900 text-white ring-slate-900"
           : "bg-white text-slate-600 ring-slate-200 hover:bg-slate-50 hover:text-slate-900"

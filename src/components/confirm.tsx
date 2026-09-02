@@ -65,12 +65,14 @@ export default function Confirm({
           </div>
         </div>
 
-        <div className="mt-5 flex justify-end gap-2">
-          <button ref={cancelRef} className="btn-secondary" onClick={onCancel}>
+        {/* Confirm above cancel on a phone, both full width: the pair reads top to bottom in
+            the order the question was asked, and neither needs an accurate tap. */}
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button ref={cancelRef} className="btn-secondary w-full sm:w-auto" onClick={onCancel}>
             Cancel
           </button>
           <button
-            className="btn-danger"
+            className="btn-danger w-full sm:w-auto"
             onClick={() => {
               request.onConfirm();
               onCancel();

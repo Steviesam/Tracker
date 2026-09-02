@@ -88,7 +88,7 @@ export default function AddInfluencers({ onAdd, onClose, busy }: Props) {
       {tab === "directory" ? (
         <div className="mt-4">
           <div className="flex flex-wrap gap-2">
-            <div className="relative min-w-[180px] flex-1">
+            <div className="relative w-full sm:min-w-[180px] sm:flex-1">
               <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 className="field pl-9"
@@ -98,7 +98,7 @@ export default function AddInfluencers({ onAdd, onClose, busy }: Props) {
               />
             </div>
             <select
-              className="field w-auto"
+              className="field flex-1 sm:w-auto sm:flex-none"
               value={state}
               onChange={(event) => setState(event.target.value)}
             >
@@ -110,7 +110,7 @@ export default function AddInfluencers({ onAdd, onClose, busy }: Props) {
               ))}
             </select>
             <select
-              className="field w-auto"
+              className="field flex-1 sm:w-auto sm:flex-none"
               value={niche}
               onChange={(event) => setNiche(event.target.value)}
             >

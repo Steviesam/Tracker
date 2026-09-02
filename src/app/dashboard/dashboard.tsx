@@ -259,7 +259,10 @@ export default function Dashboard({
 
   return (
     <div className="min-h-screen lg:flex">
-      <aside className="z-30 border-b border-white/5 bg-ink-950 text-slate-300 lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-[248px] lg:shrink-0 lg:flex-col lg:border-b-0 lg:border-r lg:border-black/40">
+      {/* Off the screen entirely on a phone, where the sections live in the bar at the foot
+          instead. A dark strip across the top would cost a fifth of the height and put the
+          navigation at the end of the reach rather than under the thumb. */}
+      <aside className="z-30 hidden bg-ink-950 text-slate-300 lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-[248px] lg:shrink-0 lg:flex-col lg:border-r lg:border-black/40">
         <div className="flex items-center gap-2.5 px-4 py-4 lg:px-5">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-950/40 ring-1 ring-inset ring-white/20">
             <IconChart className="h-[18px] w-[18px]" />
@@ -278,14 +281,14 @@ export default function Dashboard({
           <p className="mb-1.5 hidden px-2 text-[10px] font-semibold uppercase tracking-[0.09em] text-slate-600 lg:block">
             Workspace
           </p>
-          <ul className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
+          <ul className="flex flex-col gap-1">
             {sections.map((item) => {
               const selected = item.id === section;
               const Icon = SECTION_ICON[item.id];
               const badge = badgeFor(item.id);
 
               return (
-                <li key={item.id} className="lg:w-full">
+                <li key={item.id} className="w-full">
                   <button
                     className={`group relative flex w-full items-center gap-2.5 whitespace-nowrap rounded-lg px-2.5 py-2 text-left text-[13px] font-medium transition-colors duration-150 ${
                       selected
@@ -298,7 +301,7 @@ export default function Dashboard({
                     {selected ? (
                       <span
                         aria-hidden="true"
-                        className="absolute inset-y-1.5 -left-3 hidden w-[3px] rounded-r-full bg-indigo-400 lg:block"
+                        className="absolute inset-y-1.5 -left-3 w-[3px] rounded-r-full bg-indigo-400"
                       />
                     ) : null}
                     <Icon
@@ -327,7 +330,7 @@ export default function Dashboard({
 
         {/* The account sits at the foot of the rail, where people look for it, and signing
             out is an icon beside it rather than a nav item pretending to be a place. */}
-        <div className="hidden p-3 lg:block">
+        <div className="p-3">
           <div className="flex items-center gap-2.5 rounded-lg bg-white/[0.04] px-2.5 py-2 ring-1 ring-inset ring-white/[0.06]">
             <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gradient-to-br from-slate-600 to-slate-700 text-[11px] font-semibold text-white">
               {name.slice(0, 1).toUpperCase()}
@@ -352,21 +355,35 @@ export default function Dashboard({
 
       <div className="min-w-0 flex-1">
         <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-canvas/80 backdrop-blur-md">
-          <div className="mx-auto flex max-w-[1360px] flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-6 lg:px-8">
+          <div className="mx-auto flex max-w-[1360px] items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-3.5 lg:px-8">
             <div className="min-w-0">
-              <h1 className="text-[15px] font-semibold leading-tight">{active.label}</h1>
-              <p className="mt-0.5 truncate text-[13px] leading-tight text-slate-500">
+              <h1 className="truncate text-[15px] font-semibold leading-tight">{active.label}</h1>
+              {/* The strapline is a reminder, not a fact anyone needs twice — on a phone the
+                  room it takes is better spent on the first row of the list. */}
+              <p className="mt-0.5 hidden truncate text-[13px] leading-tight text-slate-500 sm:block">
                 {active.description}
               </p>
             </div>
-            <button className="btn-secondary btn-sm lg:hidden" onClick={onSignOut}>
-              <IconLogout className="h-3.5 w-3.5" />
-              Sign out
+
+            {/* The account and the way out of it, as one control: on a phone the name is the
+                only place that answers "whose account am I looking at". */}
+            <button
+              className="flex shrink-0 items-center gap-2 rounded-full border border-slate-200 bg-white py-1 pl-1 pr-2.5 shadow-xs transition-colors hover:bg-slate-50 active:bg-slate-100 lg:hidden"
+              title={`Signed in as ${email} — sign out`}
+              onClick={onSignOut}
+            >
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gradient-to-br from-slate-600 to-slate-700 text-[11px] font-semibold text-white">
+                {name.slice(0, 1).toUpperCase()}
+              </span>
+              <IconLogout className="h-4 w-4 text-slate-500" />
+              <span className="sr-only">Sign out</span>
             </button>
           </div>
         </header>
 
-        <main className="mx-auto min-w-0 max-w-[1360px] px-4 py-5 sm:px-6 lg:px-8 lg:py-6">
+        {/* The tab bar is fixed over the foot of the page, so the last row of any list needs
+            somewhere to go that is not underneath it. */}
+        <main className="mx-auto min-w-0 max-w-[1360px] px-4 pb-[calc(4.75rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-5 lg:px-8 lg:pb-6 lg:pt-6">
           {unconfigured.length > 0 && (section === "links" || section === "engagement") ? (
             <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-200/80 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-xs">
               <IconAlert className="mt-0.5 h-4 w-4 shrink-0" />
@@ -428,6 +445,43 @@ export default function Dashboard({
           ) : null}
         </main>
       </div>
+
+      {/*
+        The phone's navigation: fixed at the foot, where a thumb already rests, and showing
+        every section at once rather than a strip that runs off the edge with two of them
+        hidden behind a sideways scroll nobody thinks to try.
+      */}
+      <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur-md lg:hidden">
+        <ul className="mx-auto flex max-w-md">
+          {sections.map((item) => {
+            const selected = item.id === section;
+            const Icon = SECTION_ICON[item.id];
+            const badge = badgeFor(item.id);
+
+            return (
+              <li key={item.id} className="flex-1">
+                <button
+                  className={`relative flex w-full flex-col items-center gap-1 px-1 pb-1.5 pt-2 transition-colors ${
+                    selected ? "text-indigo-600" : "text-slate-500 active:text-slate-900"
+                  }`}
+                  aria-current={selected ? "page" : undefined}
+                  onClick={() => selectSection(item.id)}
+                >
+                  <span className="relative">
+                    <Icon className="h-[22px] w-[22px]" />
+                    {badge ? (
+                      <span className="absolute -right-2.5 -top-1 min-w-[16px] rounded-full bg-indigo-600 px-1 text-[10px] font-semibold leading-4 text-white">
+                        {badge > 99 ? "99+" : badge}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="text-[10px] font-medium leading-none">{item.label}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
 
       <Toast notice={notice} onDismiss={clearNotice} />
     </div>

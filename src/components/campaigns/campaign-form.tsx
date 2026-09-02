@@ -194,12 +194,16 @@ export default function CampaignForm({
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2">
-        <button className="btn-primary" disabled={!ready || busy} onClick={() => void submit()}>
+        <button
+          className="btn-primary w-full sm:w-auto"
+          disabled={!ready || busy}
+          onClick={() => void submit()}
+        >
           {busy ? <IconRefresh className="h-4 w-4 animate-spin" /> : null}
           {existing ? "Save changes" : "Create campaign"}
           {existing ? null : <IconArrow className="h-4 w-4" />}
         </button>
-        <button className="btn-secondary" disabled={busy} onClick={onCancel}>
+        <button className="btn-secondary w-full sm:w-auto" disabled={busy} onClick={onCancel}>
           Cancel
         </button>
       </div>
