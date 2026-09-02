@@ -29,6 +29,11 @@ model User {
 
   invitesSent Invite[] @relation("InvitedBy")
 
+  campaignsManaged Campaign[]           @relation("CampaignManager")
+  influencersOwned CampaignInfluencer[] @relation("InfluencerAssignee")
+  tasksAssigned    Task[]               @relation("TaskAssignee")
+  activities       Activity[]           @relation("ActivityActor")
+
   @@index([email])
 }
 
@@ -139,6 +144,174 @@ model Creator {
  * creator directory above is a different thing — it is the team's dataset and outlives
  * any one login.
  */
+/**
+ * One piece of work for a brand: who is on it, what they owe, and by when.
+ *
+ * This exists so the team stops keeping a campaign in a spreadsheet. Everything a
+ * spreadsheet cannot do — knowing that a deadline has passed, creating the next task when a
+ * stage is reached, saying who changed what — is the reason it is a table and not a file.
+ */
+model Campaign {
+  id String @id @default(cuid())
+
+  name  String
+  brand String
+  brief String?
+
+  startDate DateTime
+  endDate   DateTime
+
+  /// Whole rupees. Campaign money is quoted in round numbers, never in paise.
+  budget Int?
+
+  /// `PLANNING`, `ACTIVE`, `COMPLETED` or `ON_HOLD`. Set by hand — a campaign is on hold
+  /// for reasons no amount of task-counting can infer.
+  status String @default("PLANNING")
+
+  manager   User?   @relation("CampaignManager", fields: [managerId], references: [id], onDelete: SetNull)
+  managerId String?
+
+  influencers CampaignInfluencer[]
+  tasks       Task[]
+  activities  Activity[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([endDate])
+}
+
+/**
+ * One creator on one campaign.
+ *
+ * Deliberately not a foreign key to `Creator` alone: the directory is Instagram-only and
+ * built from uploaded sheets, but a campaign can involve a YouTube channel or someone
+ * nobody has added yet. So identity is the platform and handle, and `creatorId` is only a
+ * link back when they did come from the directory.
+ *
+ * Followers and engagement rate are copied in rather than read live. A campaign row is
+ * looked at many times a day and every live lookup costs money, so the number is taken once
+ * and refreshed when someone asks for it. It also means the rate you agreed a price against
+ * stays visible after the account changes.
+ */
+model CampaignInfluencer {
+  id String @id @default(cuid())
+
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId String
+
+  /// `instagram` or `youtube`.
+  platform String
+  /// Lowercased, no leading "@".
+  handle      String
+  displayName String?
+
+  /// Set when they came from the directory, so Discovery and the campaign agree.
+  creatorId String?
+
+  followers      Int?
+  engagementRate Float?
+  /// When the two numbers above were taken. Null means they were never looked up.
+  statsCheckedAt DateTime?
+
+  /// Whole rupees, as agreed with the creator.
+  agreedRate Int?
+
+  /**
+   * Whole rupees actually handed over so far.
+   *
+   * A running total rather than a paid/unpaid flag, because half up front and half on
+   * delivery is the normal arrangement, and a flag cannot say which half is outstanding. The
+   * status shown on screen is worked out from this against `agreedRate`, so the two can
+   * never disagree the way a separately stored status would.
+   */
+  amountPaid Int @default(0)
+
+  /// Set when the full agreed amount has been paid, so "settled last week" is answerable.
+  paidAt DateTime?
+
+  assignedTo   User?   @relation("InfluencerAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedToId String?
+
+  /// One of the seven stages in `src/lib/campaigns/status.ts`.
+  status String @default("SELECTED")
+
+  deadline DateTime?
+
+  tasks Task[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// The same person cannot be added to one campaign twice on the same platform.
+  @@unique([campaignId, platform, handle])
+  @@index([campaignId, status])
+  @@index([assignedToId])
+  @@index([campaignId, paidAt])
+}
+
+/**
+ * A piece of work with a name, an owner and a date.
+ *
+ * There is no stored status. "Overdue" is a fact about today and a due date, and a stored
+ * copy of it would be wrong every morning until something rewrote it. `completedAt` is the
+ * only state, and the rest is worked out when asked.
+ */
+model Task {
+  id String @id @default(cuid())
+
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId String
+
+  /// Set when the task exists because of one creator's stage, so it can be shown on
+  /// their row. Null for a task somebody typed themselves.
+  influencer   CampaignInfluencer? @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+  influencerId String?
+
+  name String
+
+  assignedTo   User?   @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedToId String?
+
+  dueDate     DateTime?
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([campaignId, completedAt])
+  @@index([assignedToId, completedAt])
+  @@index([dueDate])
+}
+
+/**
+ * What happened, in one sentence, in the order it happened.
+ *
+ * The message is written once and stored, rather than rebuilt from ids at read time. A year
+ * from now the people and stages it names may have been renamed or deleted, and the history
+ * should still read the way it did on the day.
+ */
+model Activity {
+  id String @id @default(cuid())
+
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId String
+
+  actor   User?   @relation("ActivityActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actorId String?
+
+  /// Groups the history for filtering: `influencer_added`, `status_changed`,
+  /// `task_completed`, `task_added`, `note`.
+  kind String
+
+  message String
+
+  createdAt DateTime @default(now())
+
+  @@index([campaignId, createdAt])
+}
+
 model WorkSession {
   /// Matches the `sid` in the signed cookie.
   sid String @id

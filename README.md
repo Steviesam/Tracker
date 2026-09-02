@@ -371,6 +371,124 @@ Two rules keep the number trustworthy afterwards:
 Only one number is ever stored, so filtering, sorting and the card all agree; there is never a
 second figure to reconcile.
 
+## Campaign management
+
+The point of this section is that a campaign stops living in a spreadsheet. A spreadsheet
+cannot notice that a date has passed, cannot create the next piece of work when a stage is
+reached, and cannot say who changed what — which is the entire reason those three things are
+built in here.
+
+A campaign holds creators, and moving a creator through their stages generates the work.
+
+### Stages, and the work each one creates
+
+Selected → Contacted → Confirmed → Content pending → Approved → Published → Completed.
+
+Four of those mean somebody now owes something, so reaching them creates one task:
+
+| Reaching | Creates | Due |
+| --- | --- | --- |
+| Confirmed | Send brief | the creator's deadline, else 2 days |
+| Content pending | Review content | the creator's deadline, else 3 days |
+| Approved | Track publishing | the creator's deadline, else 5 days |
+| Published | Collect analytics | the creator's deadline, else 7 days |
+| Completed | Release payment | the creator's deadline, else 7 days |
+
+The payment task is skipped for anyone already paid in full, since paying up front makes
+Completed and settled happen at the same moment.
+
+The task goes to whoever owns that creator, falling back to the campaign manager, so a
+generated task is never left with nobody to do it. A deadline that has already passed is
+ignored rather than used, because a task that is overdue the instant it exists is noise.
+Moving a creator back and forth does not pile up duplicates: a task is only created when
+there is no open one with that name for that creator.
+
+That is the whole of the automation. Nothing else happens by itself — no chasing, no status
+moving on its own — so nobody has to wonder why a row changed.
+
+### Nothing is a stored number
+
+**Overdue** is a fact about today and a due date. A stored copy would be wrong every morning
+until something rewrote it, so tasks store only `completedAt` and the rest is worked out
+when asked.
+
+**Progress** is the share of creators and tasks that are done, counted together. There is no
+box to type a percentage into: a typed one is a number about how somebody feels, and it stops
+being true the moment they stop editing it. Weighting both means a campaign cannot show as
+finished while a pile of work sits undone, and a campaign with no tasks yet still shows
+something.
+
+**Today** is India's day, fixed, on the server. Read from each browser's clock a deadline of
+the 5th would already be missed for someone on a laptop set to Sydney while it was still the
+morning of the 5th in Delhi, and two people would see different numbers on the same screen.
+
+### Adding creators
+
+Two ways, because Discovery cannot be the only one: it is Instagram-only and built from
+uploaded sheets, while a campaign routinely involves a YouTube channel or somebody nobody has
+added yet.
+
+- **From Discovery** — search and tick. The follower count comes across with them, so no
+  provider call is spent.
+- **Pasting** — a handle written as `@name`, or a profile link on either platform. A YouTube
+  channel needs its URL, since a bare name is read as Instagram.
+
+A bare word without an `@` is refused. Every word is a legal Instagram handle, so pasting
+"not a handle" once created two influencers called `not` and `a` — and unlike a wasted
+lookup, a junk row is something a person has to notice and delete.
+
+Follower counts and engagement rates are taken once and then left alone, with a button to
+refresh. Each account is a paid provider call, and a campaign row is looked at many times a
+day; it also means the rate you agreed a price against stays visible after the account moves
+on.
+
+### Paying creators
+
+The only thing stored is how much has actually been handed over. Unpaid, part paid and
+settled are all worked out from that against the agreed rate, so a status can never
+contradict the number next to it — which is exactly what a "Paid? Y/N" column in a
+spreadsheet does the first time somebody sends half up front.
+
+The box takes a running total rather than each instalment, because two people correcting the
+same figure must not end up doubling it. Every change writes its own line of history, so the
+total always has a trail behind it, and settling the balance closes the payment task by
+itself.
+
+The campaign shows four figures: budget, committed (every rate agreed, paid or not), paid,
+and outstanding. Committing more than the budget is reported, not blocked — agreeing a rate
+that goes over is a real decision people make, and a tool that refuses to record it just gets
+worked around. Overpaying one creator never reduces what another is owed.
+
+What this does **not** do: no invoices, no GST, no payment gateway, and nothing talks to a
+bank. It records what your team already knows, so that "who is still owed money" stops being
+a question somebody has to reconstruct.
+
+### Correcting things, and losing them on purpose
+
+A campaign is typed in a hurry the moment a deal lands, so everything about it can be changed
+afterwards — name, brand, dates, budget, manager, brief and status. A tool that can only
+create is one people stop trusting the first time they misspell something. Changing the dates
+deliberately does not move deadlines already set on influencers or tasks; those were agreed
+with people, and rewriting them silently would be worse than leaving them.
+
+Anything that cannot be undone asks first, and says what will actually be lost rather than
+"Are you sure?" — the tasks that go with an influencer, the money already recorded against
+them, the whole history of a campaign. Focus lands on Cancel, so a stray Enter does nothing.
+
+Deleting a task is offered, but marking it done is suggested instead, since a completed task
+stays in the history and a deleted one does not.
+
+### Finding things once a campaign is big
+
+Thirty influencers is a wall of rows, so the table filters by the questions people actually
+arrive with: everyone, mine, overdue, unpaid — plus a stage filter and a search box. Tasks
+filter to just yours, which only appears when some of them are not.
+
+Confirmations and errors look different on purpose. Dressing "Added 2 influencers" in the red
+of a failure teaches people to dismiss the banner without reading it, and then the real errors
+go unread too — so a confirmation is green and clears itself, while an error stays until it is
+dismissed.
+
 ## Accounts and security
 
 Users live in Postgres (`User` table). Passwords are bcrypt hashes at cost 12; plaintext is
@@ -447,14 +565,17 @@ choice is a provider (Resend or SES), an API key, and a verified sending domain.
 ## Architecture
 
 ```
-prisma/schema.prisma       User + Invite + RateLimit + Creator + WorkSession tables
+prisma/schema.prisma       User + Invite + RateLimit + Creator + WorkSession
+                           + Campaign + CampaignInfluencer + Task + Activity
 src/
   app/
     signup/ login/         Auth pages
-    dashboard/             Metrics | Engagement | Discovery | Access (owner)
+    dashboard/             Campaigns | Metrics | Engagement | Discovery | Access (owner)
     api/
       auth/…               Signup, login, logout
       access               The owner's invite list
+      campaigns/…          List, workspace, influencers, tasks, stat refresh
+      my-work              What is due today for the signed-in person
       upload               Scan a workbook, detect links
       urls                 Direct pasted-URL input
       process              Fetch metrics (also serves "Refresh All")
@@ -472,6 +593,7 @@ src/
     providers/             youtube | instagram | facebook | public-data
     creators/              Account-level averages and engagement rate
     directory/             Column mapping, normalisation, import, query
+    campaigns/             Stages, Indian days, progress, automation, history
     access.ts              Who may sign up, and who is the owner
     store.ts               Per-login Metrics/Engagement work (Postgres)
     export.ts              CSV + XLSX writers

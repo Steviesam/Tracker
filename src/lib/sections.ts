@@ -3,7 +3,7 @@
  * case in the dashboard's section switch — nothing else in the shell needs to change.
  */
 
-export type SectionId = "links" | "engagement" | "discovery" | "access";
+export type SectionId = "campaigns" | "links" | "engagement" | "discovery" | "access";
 
 export type Section = {
   id: SectionId;
@@ -14,6 +14,11 @@ export type Section = {
 };
 
 export const SECTIONS: Section[] = [
+  {
+    id: "campaigns",
+    label: "Campaigns",
+    description: "What is due today, and how every campaign is tracking.",
+  },
   {
     id: "links",
     label: "Metrics",
@@ -47,7 +52,11 @@ export function sectionById(id: SectionId): Section {
   return SECTIONS.find((section) => section.id === id) ?? SECTIONS[0];
 }
 
-export const DEFAULT_SECTION: SectionId = "links";
+/**
+ * Campaigns opens first: it is the only screen that answers "what do I owe today", which is
+ * the question someone has when they open the app in the morning.
+ */
+export const DEFAULT_SECTION: SectionId = "campaigns";
 
 /** Narrows an unchecked value — a URL parameter — to a section we actually have. */
 export function toSectionId(value: string | null | undefined): SectionId | null {

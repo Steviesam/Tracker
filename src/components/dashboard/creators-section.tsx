@@ -60,7 +60,7 @@ function LookUp({ busy, onLookUp }: { busy: BusyKind; onLookUp: (text: string) =
       </div>
 
       <textarea
-        className="input mt-3 h-28 resize-y font-mono text-xs"
+        className="field mt-3 h-28 resize-y font-mono text-xs"
         placeholder={PLACEHOLDER}
         spellCheck={false}
         value={text}

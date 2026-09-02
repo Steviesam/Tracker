@@ -126,7 +126,7 @@ export default function AccessSection({ email, onError }: Props) {
 
         <div className="mt-3 flex flex-wrap gap-2">
           <input
-            className="input flex-1"
+            className="field flex-1"
             type="email"
             placeholder="name@example.com"
             value={input}

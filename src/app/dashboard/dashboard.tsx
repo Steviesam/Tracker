@@ -3,18 +3,20 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import AccessSection from "@/components/dashboard/access-section";
+import CampaignsSection from "@/components/dashboard/campaigns-section";
 import CreatorsSection from "@/components/dashboard/creators-section";
 import DiscoverySection from "@/components/dashboard/discovery-section";
 import LinksSection, { type BusyKind } from "@/components/dashboard/links-section";
 import {
   IconAlert,
+  IconBriefcase,
   IconChart,
   IconCompass,
   IconKey,
   IconLogout,
   IconSpark,
 } from "@/components/icons";
-import Toast from "@/components/toast";
+import Toast, { type Notice, type NoticeTone } from "@/components/toast";
 import type { PlatformReadiness } from "@/lib/metrics";
 import {
   DEFAULT_SECTION,
@@ -39,6 +41,10 @@ type Props = {
   creatorStatsAvailable: boolean;
   /** Read from the URL on the server, so a reload opens the section the user was on. */
   initialSection: SectionId;
+  /** The campaign workspace to open, when the URL names one. */
+  initialCampaignId: string | null;
+  /** The signed-in person's id, so a new campaign defaults to them as manager. */
+  meId: string;
 };
 
 /**
@@ -66,13 +72,44 @@ function useSectionInUrl(initial: SectionId): [SectionId, (next: SectionId) => v
     const url = new URL(window.location.href);
     if (next === DEFAULT_SECTION) url.searchParams.delete("section");
     else url.searchParams.set("section", next);
+    // Leaving Campaigns must drop the open campaign too, or coming back would reopen a
+    // workspace the person had navigated away from.
+    url.searchParams.delete("campaign");
     window.history.replaceState(null, "", url);
   }, []);
 
   return [section, select];
 }
 
+/**
+ * The open campaign, also in the address bar.
+ *
+ * A campaign workspace is the screen people send each other — "look at this one" — so it has
+ * to be a link, and it has to survive the reload that follows a deploy.
+ */
+function useCampaignInUrl(initial: string | null): [string | null, (next: string | null) => void] {
+  const [campaignId, setCampaignId] = useState<string | null>(initial);
+
+  useEffect(() => {
+    const onPop = () =>
+      setCampaignId(new URLSearchParams(window.location.search).get("campaign"));
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  const open = useCallback((next: string | null) => {
+    setCampaignId(next);
+    const url = new URL(window.location.href);
+    if (next) url.searchParams.set("campaign", next);
+    else url.searchParams.delete("campaign");
+    window.history.replaceState(null, "", url);
+  }, []);
+
+  return [campaignId, open];
+}
+
 const SECTION_ICON: Record<SectionId, (p: { className?: string }) => React.ReactElement> = {
+  campaigns: IconBriefcase,
   links: IconChart,
   engagement: IconSpark,
   discovery: IconCompass,
@@ -86,16 +123,28 @@ export default function Dashboard({
   readiness,
   creatorStatsAvailable,
   initialSection,
+  initialCampaignId,
+  meId,
 }: Props) {
   const router = useRouter();
 
   const [section, selectSection] = useSectionInUrl(initialSection);
+  const [openCampaignId, openCampaign] = useCampaignInUrl(initialCampaignId);
   const [summary, setSummary] = useState<DetectionSummary | null>(null);
   const [results, setResults] = useState<LinkResult[]>([]);
   const [creatorStats, setCreatorStats] = useState<Record<string, CreatorStats>>({});
   const [lastRefreshedAt, setLastRefreshedAt] = useState<string | null>(null);
   const [busy, setBusy] = useState<BusyKind>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
+
+  // Most of the app only ever has bad news to report; campaigns also confirm things that
+  // worked, which must not arrive looking like an alarm.
+  const setError = useCallback((message: string) => setNotice({ message, tone: "error" }), []);
+  const notify = useCallback(
+    (message: string, tone: NoticeTone = "success") => setNotice({ message, tone }),
+    [],
+  );
+  const clearNotice = useCallback(() => setNotice(null), []);
 
   // Detection and results live server-side for the session, so a reload restores them.
   useEffect(() => {
@@ -118,7 +167,7 @@ export default function Dashboard({
   const startDetection = useCallback(
     async (kind: "upload" | "paste", request: () => Promise<Response>) => {
       setBusy(kind);
-      setError(null);
+      clearNotice();
       setResults([]);
       setCreatorStats({});
       setLastRefreshedAt(null);
@@ -138,12 +187,12 @@ export default function Dashboard({
         setBusy(null);
       }
     },
-    [],
+    [clearNotice, setError],
   );
 
   const runFetch = useCallback(async (kind: "process" | "refresh") => {
     setBusy(kind);
-    setError(null);
+    clearNotice();
     try {
       const response = await fetch("/api/process", { method: "POST" });
       const body = await response.json().catch(() => ({}));
@@ -159,7 +208,7 @@ export default function Dashboard({
     } finally {
       setBusy(null);
     }
-  }, []);
+  }, [clearNotice, setError]);
 
   /**
    * Kept separate from runFetch because each creator costs an extra provider call.
@@ -167,7 +216,7 @@ export default function Dashboard({
    */
   const loadCreatorStats = useCallback(async (text?: string) => {
     setBusy("creators");
-    setError(null);
+    clearNotice();
     try {
       const response = await fetch("/api/creators", {
         method: "POST",
@@ -188,7 +237,7 @@ export default function Dashboard({
     } finally {
       setBusy(null);
     }
-  }, []);
+  }, [clearNotice, setError]);
 
   async function onSignOut() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -303,7 +352,14 @@ export default function Dashboard({
           </div>
         ) : null}
 
-        {section === "links" ? (
+        {section === "campaigns" ? (
+          <CampaignsSection
+            meId={meId}
+            openCampaignId={openCampaignId}
+            onOpenCampaign={openCampaign}
+            onNotify={notify}
+          />
+        ) : section === "links" ? (
           <LinksSection
             summary={summary}
             results={results}
@@ -344,7 +400,7 @@ export default function Dashboard({
         ) : null}
       </main>
 
-      <Toast message={error} onDismiss={() => setError(null)} />
+      <Toast notice={notice} onDismiss={clearNotice} />
     </div>
   );
 }
