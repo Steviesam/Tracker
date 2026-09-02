@@ -3,29 +3,33 @@ import { z } from "zod";
 import { fromDayInput } from "@/lib/campaigns/dates";
 import { listCampaigns, people } from "@/lib/campaigns/queries";
 import { CAMPAIGN_STATUSES, isCampaignStatus } from "@/lib/campaigns/status";
+import { denyMoney, requireViewer } from "@/lib/campaigns/viewer";
 import { firstIssue } from "@/lib/credentials";
 import { prisma } from "@/lib/db";
-import { requireSession } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const auth = await requireSession();
+  const auth = await requireViewer();
   if (auth.response) return auth.response;
 
   const params = new URL(request.url).searchParams;
   const status = params.get("status");
   const search = params.get("search")?.trim();
 
-  const campaigns = await listCampaigns({
+  const campaigns = await listCampaigns(auth.viewer, {
     search: search || undefined,
     status: isCampaignStatus(status) ? status : undefined,
   });
 
   // The dropdowns need these on the same screen, and asking twice on every keystroke of the
   // search box would be a second round trip for a list that barely changes.
-  return NextResponse.json({ campaigns, people: await people() });
+  return NextResponse.json({
+    campaigns,
+    people: await people(),
+    canSeeMoney: auth.viewer.canSeeMoney,
+  });
 }
 
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date.");
@@ -43,7 +47,7 @@ const createSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const auth = await requireSession();
+  const auth = await requireViewer();
   if (auth.response) return auth.response;
 
   let input;
@@ -62,6 +66,7 @@ export async function POST(request: Request) {
   if (endDate < startDate) {
     return NextResponse.json({ error: "The end date is before the start date." }, { status: 400 });
   }
+  if (input.budget != null && !auth.viewer.canSeeMoney) return denyMoney();
 
   const campaign = await prisma.campaign.create({
     data: {

@@ -49,9 +49,9 @@ export default function SignupForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="mt-6 space-y-4">
+    <form onSubmit={onSubmit} className="mt-7 space-y-4">
       <div>
-        <label htmlFor="name" className="mb-1 block text-sm font-medium">
+        <label htmlFor="name" className="mb-1.5 block text-[13px] font-medium text-slate-700">
           Name
         </label>
         <input
@@ -65,7 +65,7 @@ export default function SignupForm() {
       </div>
 
       <div>
-        <label htmlFor="email" className="mb-1 block text-sm font-medium">
+        <label htmlFor="email" className="mb-1.5 block text-[13px] font-medium text-slate-700">
           Email
         </label>
         <input
@@ -80,7 +80,7 @@ export default function SignupForm() {
       </div>
 
       <div>
-        <label htmlFor="password" className="mb-1 block text-sm font-medium">
+        <label htmlFor="password" className="mb-1.5 block text-[13px] font-medium text-slate-700">
           Password
         </label>
         <input
@@ -93,13 +93,13 @@ export default function SignupForm() {
           value={password}
           onChange={(event) => setPassword(event.target.value)}
         />
-        <p className={`mt-1 text-xs ${tooShort ? "text-red-600" : "text-slate-500"}`}>
+        <p className={`mt-1 text-[12px] ${tooShort ? "text-rose-600" : "text-slate-500"}`}>
           At least {MIN_PASSWORD_LENGTH} characters.
         </p>
       </div>
 
       <div>
-        <label htmlFor="confirm" className="mb-1 block text-sm font-medium">
+        <label htmlFor="confirm" className="mb-1.5 block text-[13px] font-medium text-slate-700">
           Confirm password
         </label>
         <input
@@ -111,13 +111,13 @@ export default function SignupForm() {
           value={confirm}
           onChange={(event) => setConfirm(event.target.value)}
         />
-        {mismatch ? <p className="mt-1 text-xs text-red-600">Passwords do not match.</p> : null}
+        {mismatch ? <p className="mt-1 text-[12px] text-rose-600">Passwords do not match.</p> : null}
       </div>
 
       {error ? (
         <p
           role="alert"
-          className="animate-fade rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+          className="animate-fade rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[13px] text-rose-700"
         >
           {error}
         </p>

@@ -2,12 +2,22 @@
 
 import { useCallback, useEffect, useState } from "react";
 import AddInfluencers from "@/components/campaigns/add-influencers";
-import { CampaignBadge, DueDate, ProgressBar, Stat } from "@/components/campaigns/bits";
+import { Avatar, CampaignBadge, DueDate, ProgressBar, Stat } from "@/components/campaigns/bits";
 import CampaignForm from "@/components/campaigns/campaign-form";
 import InfluencerRows from "@/components/campaigns/influencer-rows";
 import TaskList from "@/components/campaigns/task-list";
 import Confirm, { type ConfirmRequest } from "@/components/confirm";
-import { IconArrow, IconEdit, IconRefresh, IconTrash, IconUsers } from "@/components/icons";
+import {
+  IconAlert,
+  IconArrow,
+  IconClock,
+  IconEdit,
+  IconPlus,
+  IconRefresh,
+  IconTrash,
+  IconUsers,
+  IconWallet,
+} from "@/components/icons";
 import type { NoticeTone } from "@/components/toast";
 import { CAMPAIGN_STATUS_LABEL, CAMPAIGN_STATUSES, type CampaignStatus } from "@/lib/campaigns/status";
 import type { CampaignDetail, Person } from "@/lib/campaigns/types";
@@ -120,9 +130,18 @@ export default function CampaignWorkspace({
 
   if (!campaign) {
     return (
-      <div className="space-y-3">
-        <div className="skeleton h-8 w-40" />
-        <div className="skeleton h-32 w-full" />
+      <div className="space-y-4">
+        <div className="skeleton h-4 w-28" />
+        <div className="card space-y-3 p-5">
+          <div className="skeleton h-6 w-56" />
+          <div className="skeleton h-3.5 w-72" />
+          <div className="skeleton h-2 w-full" />
+        </div>
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
+          {[0, 1, 2, 3, 4, 5].map((key) => (
+            <div key={key} className="skeleton h-[74px]" />
+          ))}
+        </div>
       </div>
     );
   }
@@ -138,6 +157,7 @@ export default function CampaignWorkspace({
           people={people}
           meId={meId}
           existing={campaign}
+          canSeeMoney={campaign.canSeeMoney}
           onError={onError}
           onCancel={() => setEditing(false)}
           onSaved={() => {
@@ -150,32 +170,53 @@ export default function CampaignWorkspace({
     );
   }
 
-  const { counts } = campaign;
+  const { counts, money, canSeeMoney } = campaign;
+  const open = campaign.tasks.filter((task) => task.state !== "COMPLETED");
 
   return (
     <div className="space-y-4">
-      <button className="btn-ghost -ml-2" onClick={onBack}>
-        <IconArrow className="h-4 w-4 rotate-180" />
+      <button
+        className="-ml-1.5 inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[13px] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
+        onClick={onBack}
+      >
+        <IconArrow className="h-3.5 w-3.5 rotate-180" />
         All campaigns
       </button>
 
-      <div className="card p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="card overflow-hidden">
+        <div className="flex flex-wrap items-start justify-between gap-3 p-5">
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-xl font-semibold">{campaign.name}</h2>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h2 className="text-[22px] font-semibold leading-tight">{campaign.name}</h2>
               <CampaignBadge status={campaign.status} />
             </div>
-            <p className="mt-0.5 text-sm text-slate-500">
-              {campaign.brand} · {formatDay(campaign.startDate)} – {formatDay(campaign.endDate)}
-              {campaign.manager ? ` · ${campaign.manager.name}` : ""}
-              {campaign.budget !== null ? ` · ${formatRupees(campaign.budget)}` : ""}
-            </p>
+
+            {/* Separate spans rather than one interpunct-joined string, so the pieces wrap
+                as pieces instead of breaking mid-fact on a narrow screen. */}
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-slate-500">
+              <span className="font-medium text-slate-600">{campaign.brand}</span>
+              <span className="inline-flex items-center gap-1.5">
+                <IconClock className="h-3.5 w-3.5 text-slate-400" />
+                {formatDay(campaign.startDate)} – {formatDay(campaign.endDate)}
+              </span>
+              {campaign.manager ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Avatar name={campaign.manager.name} className="h-4 w-4 text-[9px] leading-none" />
+                  {campaign.manager.name}
+                </span>
+              ) : null}
+              {campaign.budget !== null ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <IconWallet className="h-3.5 w-3.5 text-slate-400" />
+                  {formatRupees(campaign.budget)}
+                </span>
+              ) : null}
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <select
-              className="field w-auto"
+              className="field w-auto py-1.5 text-[13px]"
               value={campaign.status}
               disabled={busy}
               aria-label="Campaign status"
@@ -198,15 +239,16 @@ export default function CampaignWorkspace({
               ))}
             </select>
 
-            <button className="btn-secondary" onClick={() => setEditing(true)}>
-              <IconEdit className="h-4 w-4" />
+            <button className="btn-secondary btn-sm" onClick={() => setEditing(true)}>
+              <IconEdit className="h-3.5 w-3.5" />
               Edit
             </button>
 
             <button
-              className="btn-ghost text-slate-500 hover:text-rose-600"
+              className="btn-ghost btn-sm text-slate-400 hover:bg-rose-50 hover:text-rose-600"
               disabled={busy}
               title="Delete this campaign"
+              aria-label="Delete this campaign"
               onClick={removeCampaign}
             >
               <IconTrash className="h-4 w-4" />
@@ -214,38 +256,60 @@ export default function CampaignWorkspace({
           </div>
         </div>
 
-        <div className="mt-4">
-          <div className="mb-1.5 flex items-center justify-between text-xs">
+        <div className="border-t border-slate-100 bg-slate-50/60 px-5 py-3">
+          <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-2 text-xs">
             <span className="text-slate-500">
               {counts.influencers.total === 0 && counts.tasks.total === 0
-                ? "Progress — nothing to track yet"
-                : `Progress — ${counts.influencers.completed} of ${counts.influencers.total} influencers and ${counts.tasks.completed} of ${counts.tasks.total} tasks done`}
+                ? "Nothing to track yet"
+                : `${counts.influencers.completed} of ${counts.influencers.total} influencers and ${counts.tasks.completed} of ${counts.tasks.total} tasks done`}
             </span>
-            <span className="font-medium tabular-nums">{campaign.progress}%</span>
+            <span className="text-[13px] font-semibold tabular-nums text-slate-700">
+              {campaign.progress}%
+            </span>
           </div>
           <ProgressBar
             value={campaign.progress}
             tone={counts.tasks.overdue > 0 ? "amber" : "indigo"}
+            thick
           />
         </div>
       </div>
 
-      <div className="flex gap-1 overflow-x-auto rounded-lg bg-slate-100 p-1">
-        {TABS.map((item) => (
-          <button
-            key={item.id}
-            className={`shrink-0 rounded-md px-3 py-1.5 text-sm font-medium transition ${
-              tab === item.id ? "bg-white text-slate-900 shadow-sm" : "text-slate-600"
-            }`}
-            onClick={() => setTab(item.id)}
-          >
-            {item.label}
-            {item.id === "influencers" && counts.influencers.total > 0
-              ? ` (${counts.influencers.total})`
-              : null}
-            {item.id === "tasks" && counts.tasks.total > 0 ? ` (${counts.tasks.total})` : null}
-          </button>
-        ))}
+      {/* Underlined tabs rather than a segmented box: this is navigation within a page, and
+          a grey pill tray competes with the toolbars that sit under it. */}
+      <div className="-mb-px flex gap-5 overflow-x-auto border-b border-slate-200">
+        {TABS.map((item) => {
+          const count =
+            item.id === "influencers"
+              ? counts.influencers.total
+              : item.id === "tasks"
+                ? counts.tasks.total
+                : 0;
+
+          return (
+            <button
+              key={item.id}
+              className={`-mb-px shrink-0 border-b-2 px-0.5 pb-2.5 text-[13px] font-medium transition-colors ${
+                tab === item.id
+                  ? "border-indigo-600 text-indigo-700"
+                  : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800"
+              }`}
+              aria-current={tab === item.id ? "page" : undefined}
+              onClick={() => setTab(item.id)}
+            >
+              {item.label}
+              {count > 0 ? (
+                <span
+                  className={`ml-1.5 rounded px-1.5 py-0.5 text-[11px] tabular-nums ${
+                    tab === item.id ? "bg-indigo-50 text-indigo-700" : "bg-slate-100 text-slate-500"
+                  }`}
+                >
+                  {count}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
       </div>
 
       {tab === "overview" ? (
@@ -256,15 +320,18 @@ export default function CampaignWorkspace({
             be broken. Say what is missing and offer the one thing that fixes it.
           */}
           {counts.influencers.total === 0 ? (
-            <div className="card px-4 py-10 text-center">
-              <p className="text-sm font-medium">This campaign is empty.</p>
-              <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
+            <div className="card px-6 py-14 text-center">
+              <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-indigo-50 to-violet-100 text-indigo-600 ring-1 ring-inset ring-indigo-100">
+                <IconUsers className="h-5 w-5" />
+              </span>
+              <p className="mt-3.5 text-[15px] font-semibold">This campaign is empty.</p>
+              <p className="mx-auto mt-1.5 max-w-md text-[13px] leading-relaxed text-slate-500">
                 Add the creators you are working with. The counts, the money and the progress
                 bar are all worked out from them, and tasks start appearing on their own as
                 you move each one through their stages.
               </p>
               <button
-                className="btn-primary mt-4"
+                className="btn-primary mt-5"
                 onClick={() => {
                   setTab("influencers");
                   setAdding(true);
@@ -273,8 +340,8 @@ export default function CampaignWorkspace({
                 <IconUsers className="h-4 w-4" />
                 Add influencers
               </button>
-              {campaign.money.budget !== null ? (
-                <p className="mt-4 text-xs text-slate-400">
+              {campaign.money?.budget != null ? (
+                <p className="mt-5 text-[12px] text-slate-400">
                   Budget for this campaign is {formatRupees(campaign.money.budget)}. What you
                   agree with each creator is counted against it.
                 </p>
@@ -282,88 +349,124 @@ export default function CampaignWorkspace({
             </div>
           ) : (
             <>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-            <Stat label="Influencers" value={counts.influencers.total} />
-            <Stat label="Confirmed" value={counts.influencers.confirmed} />
-            <Stat label="Content pending" value={counts.influencers.contentPending} />
-            <Stat label="Published" value={counts.influencers.published} />
-            <Stat label="Completed" value={counts.influencers.completed} tone="good" />
-            <Stat
-              label="Overdue"
-              value={counts.influencers.overdue + counts.tasks.overdue}
-              tone={counts.influencers.overdue + counts.tasks.overdue > 0 ? "warn" : "plain"}
-            />
-          </div>
+              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
+                <Stat label="Influencers" value={counts.influencers.total} />
+                <Stat label="Confirmed" value={counts.influencers.confirmed} />
+                <Stat label="Content pending" value={counts.influencers.contentPending} />
+                <Stat label="Published" value={counts.influencers.published} />
+                <Stat label="Completed" value={counts.influencers.completed} tone="good" />
+                <Stat
+                  label="Overdue"
+                  value={counts.influencers.overdue + counts.tasks.overdue}
+                  tone={counts.influencers.overdue + counts.tasks.overdue > 0 ? "warn" : "plain"}
+                />
+              </div>
 
-          <div className="card p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-semibold">Money</p>
-              {campaign.money.outstanding > 0 ? (
-                <span className="chip bg-amber-50 text-amber-700 ring-amber-200">
-                  {formatRupees(campaign.money.outstanding)} owed to {campaign.money.owedTo}{" "}
-                  {campaign.money.owedTo === 1 ? "creator" : "creators"}
-                </span>
-              ) : campaign.money.committed > 0 ? (
-                <span className="chip bg-emerald-50 text-emerald-700 ring-emerald-200">
-                  Everyone paid
-                </span>
+              {/* Absent for members: the figures never reach the browser, so there is no
+                  panel to hide. */}
+              {money ? (
+                <div className="card overflow-hidden">
+                  <div className="card-head">
+                    <div className="flex items-center gap-2">
+                      <span className="grid h-6 w-6 place-items-center rounded-md bg-slate-100 text-slate-500">
+                        <IconWallet className="h-3.5 w-3.5" />
+                      </span>
+                      <p className="text-sm font-semibold">Money</p>
+                    </div>
+                    {money.outstanding > 0 ? (
+                      <span className="chip bg-amber-50 text-amber-700 ring-amber-200/70">
+                        {formatRupees(money.outstanding)} owed to {money.owedTo}{" "}
+                        {money.owedTo === 1 ? "creator" : "creators"}
+                      </span>
+                    ) : money.committed > 0 ? (
+                      <span className="chip bg-emerald-50 text-emerald-700 ring-emerald-200/70">
+                        Everyone paid
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-y-4 p-4 sm:grid-cols-4 sm:divide-x sm:divide-slate-100">
+                    <Stat flat label="Budget" value={formatRupees(money.budget)} />
+                    <Stat
+                      flat
+                      label="Committed"
+                      value={formatRupees(money.committed)}
+                      hint={
+                        money.budget !== null && money.committed > 0
+                          ? `${Math.round((money.committed / money.budget) * 100)}% of budget`
+                          : undefined
+                      }
+                    />
+                    <Stat flat label="Paid" value={formatRupees(money.paid)} tone="good" />
+                    <Stat
+                      flat
+                      label="Outstanding"
+                      value={formatRupees(money.outstanding)}
+                      tone={money.outstanding > 0 ? "warn" : "plain"}
+                    />
+                  </div>
+
+                  {money.overBudget ? (
+                    <p className="flex items-start gap-2 border-t border-rose-100 bg-rose-50/70 px-4 py-2.5 text-[12px] font-medium text-rose-700">
+                      <IconAlert className="mt-px h-3.5 w-3.5 shrink-0" />
+                      Committed rates are{" "}
+                      {formatRupees(money.committed - (money.budget ?? 0))} over the budget on
+                      this campaign.
+                    </p>
+                  ) : null}
+                </div>
               ) : null}
-            </div>
-
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <Stat label="Budget" value={formatRupees(campaign.money.budget)} />
-              <Stat label="Committed" value={formatRupees(campaign.money.committed)} />
-              <Stat label="Paid" value={formatRupees(campaign.money.paid)} tone="good" />
-              <Stat
-                label="Outstanding"
-                value={formatRupees(campaign.money.outstanding)}
-                tone={campaign.money.outstanding > 0 ? "warn" : "plain"}
-              />
-            </div>
-
-            {campaign.money.overBudget ? (
-              <p className="mt-3 text-xs font-medium text-rose-600">
-                Committed rates are{" "}
-                {formatRupees(campaign.money.committed - (campaign.money.budget ?? 0))} over the
-                budget on this campaign.
-              </p>
-            ) : null}
-          </div>
             </>
           )}
 
           {campaign.brief ? (
             <div className="card p-4">
               <p className="label">Brief</p>
-              <p className="mt-1.5 whitespace-pre-wrap text-sm text-slate-700">{campaign.brief}</p>
+              <p className="mt-2 whitespace-pre-wrap text-[13px] leading-relaxed text-slate-700">
+                {campaign.brief}
+              </p>
             </div>
           ) : null}
 
           <div className="card overflow-hidden">
-            <p className="border-b border-slate-100 px-4 py-3 text-sm font-semibold">
-              Next up
-            </p>
-            {campaign.tasks.filter((task) => task.state !== "COMPLETED").length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-slate-500">
+            <div className="card-head">
+              <p className="text-sm font-semibold">Next up</p>
+              {open.length > 5 ? (
+                <button
+                  className="text-xs font-medium text-indigo-600 transition-colors hover:text-indigo-700"
+                  onClick={() => setTab("tasks")}
+                >
+                  See all {open.length}
+                </button>
+              ) : null}
+            </div>
+            {open.length === 0 ? (
+              <p className="px-4 py-9 text-center text-[13px] text-slate-500">
                 Nothing outstanding. Tasks appear here as influencers move through their
                 stages.
               </p>
             ) : (
               <ul className="divide-y divide-slate-100">
-                {campaign.tasks
-                  .filter((task) => task.state !== "COMPLETED")
-                  .slice(0, 5)
-                  .map((task) => (
-                    <li key={task.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
-                      <span className="min-w-0 flex-1 truncate text-sm">{task.name}</span>
-                      {task.assignedTo ? (
-                        <span className="text-xs text-slate-500">{task.assignedTo.name}</span>
-                      ) : null}
-                      <span className="text-xs">
-                        <DueDate iso={task.dueDate} />
+                {open.slice(0, 5).map((task) => (
+                  <li
+                    key={task.id}
+                    className="flex flex-wrap items-center gap-3 px-4 py-2.5 transition-colors hover:bg-slate-50/70"
+                  >
+                    <span className="min-w-0 flex-1 truncate text-[13px]">{task.name}</span>
+                    {task.assignedTo ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+                        <Avatar
+                          name={task.assignedTo.name}
+                          className="h-4 w-4 text-[9px] leading-none"
+                        />
+                        {task.assignedTo.name}
                       </span>
-                    </li>
-                  ))}
+                    ) : null}
+                    <span className="text-xs">
+                      <DueDate iso={task.dueDate} />
+                    </span>
+                  </li>
+                ))}
               </ul>
             )}
           </div>
@@ -406,6 +509,7 @@ export default function CampaignWorkspace({
             />
           ) : (
             <button className="btn-primary" onClick={() => setAdding(true)}>
+              <IconPlus className="h-4 w-4" />
               Add influencers
             </button>
           )}
@@ -415,6 +519,7 @@ export default function CampaignWorkspace({
             meId={meId}
             influencers={campaign.influencers}
             people={people}
+            canSeeMoney={canSeeMoney}
             busy={busy}
             onSend={send}
             onNotify={onNotify}
@@ -439,19 +544,35 @@ export default function CampaignWorkspace({
       {tab === "activity" ? (
         <div className="card overflow-hidden">
           {campaign.activity.length === 0 ? (
-            <p className="px-4 py-10 text-center text-sm text-slate-500">Nothing has happened yet.</p>
+            <p className="px-4 py-12 text-center text-[13px] text-slate-500">
+              Nothing has happened yet.
+            </p>
           ) : (
-            <ul className="divide-y divide-slate-100">
-              {campaign.activity.map((entry) => (
-                <li key={entry.id} className="px-4 py-2.5">
-                  <p className="text-sm">{entry.message}</p>
-                  <p className="text-xs text-slate-400">
-                    {new Date(entry.createdAt).toLocaleString("en-IN", {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                      timeZone: "Asia/Kolkata",
-                    })}
-                  </p>
+            /* A rail with a node per entry: the history reads as one thread rather than as
+               unrelated rows that happen to be stacked. */
+            <ul className="space-y-0 px-4 py-3">
+              {campaign.activity.map((entry, index) => (
+                <li key={entry.id} className="relative flex gap-3 pb-4 last:pb-0">
+                  {index < campaign.activity.length - 1 ? (
+                    <span
+                      aria-hidden="true"
+                      className="absolute left-[5px] top-3.5 h-full w-px bg-slate-200"
+                    />
+                  ) : null}
+                  <span
+                    aria-hidden="true"
+                    className="relative mt-1.5 h-[11px] w-[11px] shrink-0 rounded-full border-2 border-white bg-slate-300 ring-1 ring-slate-200"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] leading-snug text-slate-700">{entry.message}</p>
+                    <p className="mt-0.5 text-[11px] text-slate-400">
+                      {new Date(entry.createdAt).toLocaleString("en-IN", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                        timeZone: "Asia/Kolkata",
+                      })}
+                    </p>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -459,8 +580,9 @@ export default function CampaignWorkspace({
         </div>
       ) : null}
 
+      {/* Floats rather than sits in the flow, so a save does not nudge the page down. */}
       {busy ? (
-        <p className="flex items-center gap-2 text-xs text-slate-500">
+        <p className="animate-fade pointer-events-none fixed bottom-5 left-1/2 z-30 inline-flex -translate-x-1/2 items-center gap-2 rounded-full bg-ink-900/90 px-3.5 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur">
           <IconRefresh className="h-3.5 w-3.5 animate-spin" />
           Saving…
         </p>

@@ -271,6 +271,11 @@ model Task {
 
   name String
 
+  /// GENERAL, or PAYMENT for the task that releasing money creates. Money is owner-only,
+  /// so the reader has to be able to tell which tasks are about it — and matching on the
+  /// name would break the moment somebody edits one or writes their own.
+  kind String @default("GENERAL")
+
   assignedTo   User?   @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   assignedToId String?
 
@@ -283,6 +288,7 @@ model Task {
   @@index([campaignId, completedAt])
   @@index([assignedToId, completedAt])
   @@index([dueDate])
+  @@index([kind])
 }
 
 /**

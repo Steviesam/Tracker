@@ -6,7 +6,8 @@ import { completeTask, reopenTask } from "@/lib/campaigns/mutations";
 import { findCampaign } from "@/lib/campaigns/queries";
 import { firstIssue } from "@/lib/credentials";
 import { prisma } from "@/lib/db";
-import { requireSession } from "@/lib/session";
+import { PAYMENT_TASK } from "@/lib/campaigns/visibility";
+import { denyMoney, requireViewer } from "@/lib/campaigns/viewer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,7 +22,7 @@ const createSchema = z.object({
 });
 
 export async function POST(request: Request, context: Context) {
-  const auth = await requireSession();
+  const auth = await requireViewer();
   if (auth.response) return auth.response;
 
   const { id } = await context.params;
@@ -59,7 +60,7 @@ export async function POST(request: Request, context: Context) {
     await record(tx, id, auth.session.uid, "task_added", `${auth.session.name} added ${task.name}`);
   });
 
-  return NextResponse.json({ campaign: await findCampaign(id) });
+  return NextResponse.json({ campaign: await findCampaign(id, auth.viewer) });
 }
 
 const patchSchema = z.object({
@@ -68,7 +69,7 @@ const patchSchema = z.object({
 });
 
 export async function PATCH(request: Request, context: Context) {
-  const auth = await requireSession();
+  const auth = await requireViewer();
   if (auth.response) return auth.response;
 
   const { id } = await context.params;
@@ -83,26 +84,38 @@ export async function PATCH(request: Request, context: Context) {
 
   const task = await prisma.task.findUnique({
     where: { id: input.taskId },
-    select: { campaignId: true },
+    select: { campaignId: true, kind: true },
   });
   if (!task || task.campaignId !== id) {
     return NextResponse.json({ error: "That task is not on this campaign." }, { status: 404 });
   }
+  // A member was never sent this task, so they cannot honestly be ticking it off.
+  if (task.kind === PAYMENT_TASK && !auth.viewer.canSeeMoney) return denyMoney();
 
   if (input.completed) await completeTask(input.taskId, auth.session.uid, auth.session.name);
   else await reopenTask(input.taskId);
 
-  return NextResponse.json({ campaign: await findCampaign(id) });
+  return NextResponse.json({ campaign: await findCampaign(id, auth.viewer) });
 }
 
 export async function DELETE(request: Request, context: Context) {
-  const auth = await requireSession();
+  const auth = await requireViewer();
   if (auth.response) return auth.response;
 
   const { id } = await context.params;
   const taskId = new URL(request.url).searchParams.get("taskId");
   if (!taskId) return NextResponse.json({ error: "Which task?" }, { status: 400 });
 
+  // Refused rather than quietly matching nothing: a 200 for a delete that deleted nothing
+  // is the sort of answer that sends someone hunting for a bug that is not there.
+  const doomed = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { campaignId: true, kind: true },
+  });
+  if (doomed?.campaignId === id && doomed.kind === PAYMENT_TASK && !auth.viewer.canSeeMoney) {
+    return denyMoney();
+  }
+
   await prisma.task.deleteMany({ where: { id: taskId, campaignId: id } });
-  return NextResponse.json({ campaign: await findCampaign(id) });
+  return NextResponse.json({ campaign: await findCampaign(id, auth.viewer) });
 }

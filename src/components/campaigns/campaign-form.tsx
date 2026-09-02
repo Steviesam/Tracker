@@ -12,6 +12,8 @@ type Props = {
   meId: string;
   /** Present when editing. Everything a campaign holds can be corrected afterwards. */
   existing?: CampaignDetail;
+  /** False for members, who get no budget box and send no budget. */
+  canSeeMoney: boolean;
   onSaved: (id: string) => void;
   onCancel: () => void;
   onError: (message: string) => void;
@@ -29,6 +31,7 @@ export default function CampaignForm({
   people,
   meId,
   existing,
+  canSeeMoney,
   onSaved,
   onCancel,
   onError,
@@ -67,8 +70,10 @@ export default function CampaignForm({
             endDate,
             brief: brief.trim() || (existing ? null : undefined),
             managerId: managerId || undefined,
+            // Left out entirely for a member rather than sent as null: they were handed a
+            // redacted campaign, and echoing that back would erase a budget they cannot see.
             // An empty box means "not decided", which is different from a budget of zero.
-            budget: budget.trim() === "" ? null : Number(budget),
+            ...(canSeeMoney ? { budget: budget.trim() === "" ? null : Number(budget) } : {}),
             status,
           }),
         },
@@ -150,15 +155,17 @@ export default function CampaignForm({
           </select>
         </Field>
 
-        <Field label="Budget (₹, optional)">
-          <input
-            className="field"
-            inputMode="numeric"
-            value={budget}
-            placeholder="250000"
-            onChange={(event) => setBudget(event.target.value.replace(/[^\d]/g, ""))}
-          />
-        </Field>
+        {canSeeMoney ? (
+          <Field label="Budget (₹, optional)">
+            <input
+              className="field"
+              inputMode="numeric"
+              value={budget}
+              placeholder="250000"
+              onChange={(event) => setBudget(event.target.value.replace(/[^\d]/g, ""))}
+            />
+          </Field>
+        ) : null}
 
         <Field label="Status">
           <select

@@ -1,11 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CampaignBadge, ProgressBar } from "@/components/campaigns/bits";
+import { Avatar, CampaignBadge, ProgressBar } from "@/components/campaigns/bits";
 import CampaignForm from "@/components/campaigns/campaign-form";
 import MyWorkPanel from "@/components/campaigns/my-work";
 import CampaignWorkspace from "@/components/campaigns/workspace";
-import { IconAlert, IconArrow, IconRefresh, IconSearch, IconUsers } from "@/components/icons";
+import {
+  IconAlert,
+  IconBriefcase,
+  IconClock,
+  IconPlus,
+  IconRefresh,
+  IconSearch,
+  IconUsers,
+  IconWallet,
+} from "@/components/icons";
 import type { NoticeTone } from "@/components/toast";
 import { CAMPAIGN_STATUS_LABEL, CAMPAIGN_STATUSES, type CampaignStatus } from "@/lib/campaigns/status";
 import type { CampaignSummary, MyWork, Person } from "@/lib/campaigns/types";
@@ -32,6 +41,9 @@ export default function CampaignsSection({
   const [status, setStatus] = useState<CampaignStatus | "">("");
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Answered by the server on every load rather than passed down from the page, so a role
+  // taken away in another tab stops showing money at the next request, not the next login.
+  const [canSeeMoney, setCanSeeMoney] = useState(false);
 
   const onError = useCallback(
     (message: string) => onNotify(message, "error"),
@@ -55,6 +67,7 @@ export default function CampaignsSection({
       }
       setCampaigns(listed.campaigns ?? []);
       setPeople(listed.people ?? []);
+      setCanSeeMoney(listed.canSeeMoney === true);
       setWork(mine.error ? null : mine);
     } catch {
       onError("Could not load campaigns.");
@@ -122,6 +135,7 @@ export default function CampaignsSection({
         <CampaignForm
           people={people}
           meId={meId}
+          canSeeMoney={canSeeMoney}
           onError={onError}
           onCancel={() => setCreating(false)}
           onSaved={(id) => {
@@ -156,96 +170,133 @@ export default function CampaignsSection({
           </select>
 
           <button className="btn-primary" onClick={() => setCreating(true)}>
+            <IconPlus className="h-4 w-4" />
             New campaign
           </button>
         </div>
       )}
 
       {campaigns === null ? (
-        <div className="space-y-2">
-          <div className="skeleton h-24 w-full" />
-          <div className="skeleton h-24 w-full" />
-        </div>
+        <ul className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+          {[0, 1, 2].map((key) => (
+            <li key={key} className="card space-y-3 p-4">
+              <div className="skeleton h-4 w-1/2" />
+              <div className="skeleton h-3 w-1/3" />
+              <div className="skeleton h-1.5 w-full" />
+              <div className="skeleton h-3 w-2/3" />
+            </li>
+          ))}
+        </ul>
       ) : campaigns.length === 0 ? (
-        <div className="card px-4 py-12 text-center">
-          <p className="text-sm font-medium">
+        <div className="card px-6 py-16 text-center">
+          <span className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-slate-100 text-slate-400">
+            <IconBriefcase className="h-5 w-5" />
+          </span>
+          <p className="mt-3 text-sm font-medium">
             {search || status ? "No campaign matches that." : "No campaigns yet."}
           </p>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">
             {search || status
               ? "Try a different search, or clear the status filter."
               : "Create one, add influencers from Discovery, and the tracking starts itself."}
           </p>
+          {!search && !status ? (
+            <button className="btn-primary mt-4" onClick={() => setCreating(true)}>
+              <IconPlus className="h-4 w-4" />
+              New campaign
+            </button>
+          ) : null}
         </div>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
-          {campaigns.map((campaign, index) => (
-            <li key={campaign.id} className="animate-rise" style={{ "--i": index } as React.CSSProperties}>
-              <button
-                className="card-interactive w-full p-4 text-left"
-                onClick={() => onOpenCampaign(campaign.id)}
+        <ul className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+          {campaigns.map((campaign, index) => {
+            const late = campaign.tasks.overdue + campaign.influencers.overdue;
+
+            return (
+              <li
+                key={campaign.id}
+                className="animate-rise"
+                style={{ "--i": index } as React.CSSProperties}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold">{campaign.name}</p>
-                    <p className="truncate text-sm text-slate-500">{campaign.brand}</p>
+                <button
+                  className="card-interactive group flex h-full w-full flex-col p-4 text-left"
+                  onClick={() => onOpenCampaign(campaign.id)}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-[15px] font-semibold leading-tight transition-colors group-hover:text-indigo-700">
+                        {campaign.name}
+                      </p>
+                      <p className="mt-0.5 truncate text-[13px] text-slate-500">{campaign.brand}</p>
+                    </div>
+                    <CampaignBadge status={campaign.status} />
                   </div>
-                  <CampaignBadge status={campaign.status} />
-                </div>
 
-                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
-                  <span className="inline-flex items-center gap-1.5">
-                    <IconUsers className="h-3.5 w-3.5" />
-                    {campaign.influencers.total}{" "}
-                    {campaign.influencers.total === 1 ? "influencer" : "influencers"}
-                  </span>
-                  <span>
-                    {formatDay(campaign.startDate)} – {formatDay(campaign.endDate)}
-                  </span>
-                  {campaign.manager ? <span>{campaign.manager.name}</span> : null}
-                </div>
-
-                <div className="mt-3">
-                  <div className="mb-1.5 flex items-center justify-between text-xs">
-                    <span className="text-slate-500">Progress</span>
-                    <span className="font-medium tabular-nums">{campaign.progress}%</span>
+                  <div className="mt-3.5">
+                    <div className="mb-1.5 flex items-baseline justify-between gap-2 text-xs">
+                      <span className="text-slate-500">
+                        {campaign.influencers.total === 0
+                          ? "No creators yet"
+                          : `${campaign.influencers.completed} of ${campaign.influencers.total} creators done`}
+                      </span>
+                      <span className="text-[13px] font-semibold tabular-nums text-slate-700">
+                        {campaign.progress}%
+                      </span>
+                    </div>
+                    <ProgressBar
+                      value={campaign.progress}
+                      tone={campaign.tasks.overdue > 0 ? "amber" : "indigo"}
+                    />
                   </div>
-                  <ProgressBar value={campaign.progress} />
-                </div>
 
-                {campaign.tasks.overdue > 0 || campaign.influencers.overdue > 0 ? (
-                  <p className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-rose-600">
-                    <IconAlert className="h-3.5 w-3.5" />
-                    {[
-                      campaign.tasks.overdue > 0 ? `${campaign.tasks.overdue} task` : null,
-                      campaign.influencers.overdue > 0
-                        ? `${campaign.influencers.overdue} influencer`
-                        : null,
-                    ]
-                      .filter(Boolean)
-                      .join(", ")}{" "}
-                    overdue
-                  </p>
-                ) : campaign.tasks.dueToday > 0 ? (
-                  <p className="mt-3 text-xs font-medium text-amber-600">
-                    {campaign.tasks.dueToday} due today
-                  </p>
-                ) : null}
+                  {/* Pushed to the foot so cards of different heights still line up. */}
+                  <div className="mt-auto pt-3.5">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                      <span className="inline-flex items-center gap-1.5">
+                        <IconUsers className="h-3.5 w-3.5 text-slate-400" />
+                        {campaign.influencers.total}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <IconClock className="h-3.5 w-3.5 text-slate-400" />
+                        {formatDay(campaign.startDate)} – {formatDay(campaign.endDate)}
+                      </span>
+                      {campaign.manager ? (
+                        <span className="inline-flex min-w-0 items-center gap-1.5">
+                          <Avatar
+                            name={campaign.manager.name}
+                            className="h-4 w-4 text-[9px] leading-none"
+                          />
+                          <span className="truncate">{campaign.manager.name}</span>
+                        </span>
+                      ) : null}
+                    </div>
 
-                {campaign.money.outstanding > 0 ? (
-                  <p className="mt-1.5 text-xs text-slate-500">
-                    {formatRupees(campaign.money.outstanding)} still owed to{" "}
-                    {campaign.money.owedTo}{" "}
-                    {campaign.money.owedTo === 1 ? "creator" : "creators"}
-                  </p>
-                ) : null}
-
-                <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-indigo-600">
-                  Open <IconArrow className="h-3.5 w-3.5" />
-                </span>
-              </button>
-            </li>
-          ))}
+                    {late > 0 || campaign.tasks.dueToday > 0 || (campaign.money?.outstanding ?? 0) > 0 ? (
+                      <div className="mt-2.5 flex flex-wrap gap-1.5">
+                        {late > 0 ? (
+                          <span className="chip bg-rose-50 text-rose-700 ring-rose-200/70">
+                            <IconAlert className="h-3 w-3" />
+                            {late} overdue
+                          </span>
+                        ) : null}
+                        {campaign.tasks.dueToday > 0 ? (
+                          <span className="chip bg-amber-50 text-amber-700 ring-amber-200/70">
+                            {campaign.tasks.dueToday} due today
+                          </span>
+                        ) : null}
+                        {campaign.money && campaign.money.outstanding > 0 ? (
+                          <span className="chip bg-slate-50 text-slate-600 ring-slate-200">
+                            <IconWallet className="h-3 w-3" />
+                            {formatRupees(campaign.money.outstanding)} owed
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
 

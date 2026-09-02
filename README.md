@@ -463,6 +463,35 @@ What this does **not** do: no invoices, no GST, no payment gateway, and nothing 
 bank. It records what your team already knows, so that "who is still owed money" stops being
 a question somebody has to reconstruct.
 
+### Money is owner-only
+
+What a creator is being paid, what the brand handed over, and the margin between the two are
+nobody else's business. Members see stages, deadlines and tasks; they do not see a single
+rupee figure. Only the owner does.
+
+This is enforced where the data is read, not where it is drawn. A member's browser is never
+sent the budget, the agreed rate, the amount paid, the payment state, the campaign's money
+rollup, or any line of history about money — so there is nothing to find in devtools. Writing
+those fields is refused too, with a 403 rather than a silent no-op. The role is read from the
+database on every request, so taking ownership away stops the figures at the next request
+rather than at the next login.
+
+Two consequences worth knowing:
+
+The **"Release payment" task disappears for members** entirely, and is assigned to the
+campaign manager rather than to whoever owns the creator. The task counts and the progress
+bar are then worked out from what that person can see, so a member and an owner can read
+slightly different progress on the same campaign. That is deliberate: the alternative is a
+tab reading "Tasks 13" above a list of eleven, which is a contradiction on one screen in
+front of one pair of eyes, rather than between two people who rarely compare percentages.
+
+**Withheld figures are null, never zero.** "Outstanding ₹0" would read as "everybody has been
+paid", which is a confident wrong answer; absent says only that the reader was not given the
+number, and the screens draw nothing at all.
+
+Payment tasks are recognised by a `kind` column on `Task`, not by matching their name — a
+name is editable, and anyone can type "Release payment" into the box themselves.
+
 ### Correcting things, and losing them on purpose
 
 A campaign is typed in a hurry the moment a deal lands, so everything about it can be changed
@@ -481,8 +510,8 @@ stays in the history and a deleted one does not.
 ### Finding things once a campaign is big
 
 Thirty influencers is a wall of rows, so the table filters by the questions people actually
-arrive with: everyone, mine, overdue, unpaid — plus a stage filter and a search box. Tasks
-filter to just yours, which only appears when some of them are not.
+arrive with: everyone, mine, overdue, and — for the owner — unpaid, plus a stage filter and a
+search box. Tasks filter to just yours, which only appears when some of them are not.
 
 Confirmations and errors look different on purpose. Dressing "Added 2 influencers" in the red
 of a failure teaches people to dismiss the banner without reading it, and then the real errors
@@ -584,8 +613,10 @@ src/
       export               CSV / XLSX download
       directory            Filtered creator search + dropdown values
       directory/import     Import a creator sheet into the directory
+    globals.css          Design tokens — buttons, fields, cards, chips, segments
   components/
     dashboard/             One component per sidebar section
+    campaigns/             Workspace, influencer rows, tasks, shared badges
   lib/
     detect.ts              URL extraction, platform ID, canonicalisation, dedupe
     parse.ts               Excel + CSV reading across all sheets
@@ -594,10 +625,19 @@ src/
     creators/              Account-level averages and engagement rate
     directory/             Column mapping, normalisation, import, query
     campaigns/             Stages, Indian days, progress, automation, history
+      visibility.ts        What a member may not see, and why
+      viewer.ts            Route guard: who is asking, and may they see money
     access.ts              Who may sign up, and who is the owner
     store.ts               Per-login Metrics/Engagement work (Postgres)
     export.ts              CSV + XLSX writers
 ```
+
+**The look is a small set of tokens, not per-component styling.** `globals.css` defines
+`btn-primary`, `field`, `card`, `chip`, `segment` and a few others; `tailwind.config.ts`
+overrides the shadow scale so every raised surface uses the same two-part shadow. Screens are
+built out of these rather than raw utility strings, so a change to the button shape or the
+card border happens once and lands everywhere. If you find yourself writing
+`rounded-lg border border-slate-200 bg-white shadow-sm` again, that is `card`.
 
 Each platform has a provider **chain**: the official API is tried first, and the
 third-party provider is only reached when the official one is unconfigured or returns

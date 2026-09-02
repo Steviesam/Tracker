@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { IconAlert, IconCheck } from "@/components/icons";
+import { IconAlert, IconCheck, IconClose } from "@/components/icons";
 
 export type NoticeTone = "error" | "success";
 
@@ -47,24 +47,24 @@ export default function Toast({
   return (
     <div
       role={good ? "status" : "alert"}
-      className={`animate-rise fixed bottom-5 right-5 z-50 flex max-w-sm items-start gap-3 rounded-xl border bg-white p-4 shadow-lg shadow-slate-900/10 ${
-        good ? "border-emerald-200" : "border-red-200"
+      className={`animate-rise fixed bottom-5 right-5 z-50 flex max-w-sm items-start gap-3 rounded-xl border bg-white p-3.5 pr-3 shadow-xl ${
+        good ? "border-emerald-200/80" : "border-rose-200/80"
       }`}
     >
       <span
-        className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full ${
-          good ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"
+        className={`mt-px grid h-6 w-6 shrink-0 place-items-center rounded-full ${
+          good ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
         }`}
       >
         {good ? <IconCheck className="h-3.5 w-3.5" /> : <IconAlert className="h-3.5 w-3.5" />}
       </span>
-      <p className="flex-1 text-sm leading-snug text-slate-700">{notice.message}</p>
+      <p className="flex-1 pt-0.5 text-[13px] leading-snug text-slate-700">{notice.message}</p>
       <button
-        className="shrink-0 rounded p-0.5 text-slate-400 transition-colors hover:text-slate-900"
+        className="-mt-0.5 shrink-0 rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900"
         onClick={onDismiss}
         aria-label="Dismiss"
       >
-        ✕
+        <IconClose className="h-3.5 w-3.5" />
       </button>
     </div>
   );

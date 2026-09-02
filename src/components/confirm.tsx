@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { IconAlert } from "@/components/icons";
 
 export type ConfirmRequest = {
   title: string;
@@ -44,24 +45,32 @@ export default function Confirm({
 
   return (
     <div
-      className="animate-fade fixed inset-0 z-50 grid place-items-center bg-slate-900/40 p-4"
+      className="animate-fade fixed inset-0 z-50 grid place-items-center bg-ink-950/50 p-4 backdrop-blur-[2px]"
       role="dialog"
       aria-modal="true"
       aria-label={request.title}
       onClick={onCancel}
     >
       <div
-        className="animate-rise w-full max-w-sm rounded-xl border border-slate-200 bg-white p-5 shadow-xl"
+        className="animate-pop w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl"
         onClick={(event) => event.stopPropagation()}
       >
-        <h3 className="text-base font-semibold">{request.title}</h3>
-        <p className="mt-1.5 text-sm text-slate-600">{request.body}</p>
+        <div className="flex gap-3.5">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-rose-50 text-rose-600">
+            <IconAlert className="h-[18px] w-[18px]" />
+          </span>
+          <div className="min-w-0">
+            <h3 className="text-[15px] font-semibold">{request.title}</h3>
+            <p className="mt-1.5 text-[13px] leading-relaxed text-slate-600">{request.body}</p>
+          </div>
+        </div>
+
         <div className="mt-5 flex justify-end gap-2">
           <button ref={cancelRef} className="btn-secondary" onClick={onCancel}>
             Cancel
           </button>
           <button
-            className="btn bg-rose-600 text-white shadow-sm hover:bg-rose-500 active:bg-rose-700"
+            className="btn-danger"
             onClick={() => {
               request.onConfirm();
               onCancel();

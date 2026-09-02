@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { DueDate } from "@/components/campaigns/bits";
+import { Avatar, DueDate } from "@/components/campaigns/bits";
 import type { ConfirmRequest } from "@/components/confirm";
-import { IconCheck, IconTrash } from "@/components/icons";
+import { IconCheck, IconPlus, IconTrash } from "@/components/icons";
 import type { NoticeTone } from "@/components/toast";
 import type { Person, TaskView } from "@/lib/campaigns/types";
 
@@ -111,26 +111,27 @@ export default function TaskList({
             aria-label="Due date"
             onChange={(event) => setDueDate(event.target.value)}
           />
-          <button className="btn-primary" disabled={busy || name.trim().length === 0} onClick={() => void add()}>
+          <button
+            className="btn-primary"
+            disabled={busy || name.trim().length === 0}
+            onClick={() => void add()}
+          >
+            <IconPlus className="h-4 w-4" />
             Add
           </button>
         </div>
       </div>
 
       {mineCount > 0 && mineCount !== tasks.length ? (
-        <div className="flex gap-1 rounded-lg bg-slate-100 p-1 sm:w-fit">
+        <div className="segment sm:w-fit">
           <button
-            className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-              mineOnly ? "text-slate-600" : "bg-white text-slate-900 shadow-sm"
-            }`}
+            className={`segment-item ${mineOnly ? "" : "segment-item-on"}`}
             onClick={() => setMineOnly(false)}
           >
             All tasks ({tasks.length})
           </button>
           <button
-            className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-              mineOnly ? "bg-white text-slate-900 shadow-sm" : "text-slate-600"
-            }`}
+            className={`segment-item ${mineOnly ? "segment-item-on" : ""}`}
             onClick={() => setMineOnly(true)}
           >
             Mine ({mineCount})
@@ -197,30 +198,33 @@ function TaskGroup({
 }) {
   return (
     <div className="card overflow-hidden">
-      <p className="border-b border-slate-100 px-4 py-3 text-sm font-semibold">{title}</p>
+      <p className="border-b border-slate-100 px-4 py-2.5 text-[13px] font-semibold">{title}</p>
       {tasks.length === 0 ? (
-        <p className="px-4 py-8 text-center text-sm text-slate-500">{empty}</p>
+        <p className="px-4 py-9 text-center text-[13px] text-slate-500">{empty}</p>
       ) : (
         <ul className="divide-y divide-slate-100">
           {tasks.map((task) => {
             const finished = task.state === "COMPLETED";
             return (
-              <li key={task.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
+              <li
+                key={task.id}
+                className="group flex flex-wrap items-center gap-3 px-4 py-2.5 transition-colors hover:bg-slate-50/70"
+              >
                 <button
-                  className={`grid h-5 w-5 shrink-0 place-items-center rounded border transition ${
+                  className={`grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[6px] border transition ${
                     finished
                       ? "border-emerald-500 bg-emerald-500 text-white"
-                      : "border-slate-300 text-transparent hover:border-emerald-500 hover:text-emerald-600"
+                      : "border-slate-300 bg-white text-transparent hover:border-emerald-500 hover:bg-emerald-500 hover:text-white"
                   }`}
                   disabled={busy}
                   aria-label={finished ? `Reopen ${task.name}` : `Complete ${task.name}`}
                   onClick={() => onToggle(task)}
                 >
-                  <IconCheck className="h-3.5 w-3.5" />
+                  <IconCheck className="h-3 w-3" />
                 </button>
 
                 <span
-                  className={`min-w-0 flex-1 truncate text-sm ${
+                  className={`min-w-0 flex-1 truncate text-[13px] ${
                     finished ? "text-slate-400 line-through" : ""
                   }`}
                 >
@@ -228,7 +232,10 @@ function TaskGroup({
                 </span>
 
                 {task.assignedTo ? (
-                  <span className="text-xs text-slate-500">{task.assignedTo.name}</span>
+                  <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+                    <Avatar name={task.assignedTo.name} className="h-4 w-4 text-[9px] leading-none" />
+                    {task.assignedTo.name}
+                  </span>
                 ) : (
                   <span className="text-xs text-slate-400">Unassigned</span>
                 )}
@@ -237,13 +244,15 @@ function TaskGroup({
                   <DueDate iso={task.dueDate} done={finished} />
                 </span>
 
+                {/* Hidden until the row is under the cursor: a column of bins invites the
+                    one click on this screen that cannot be undone. */}
                 <button
-                  className="text-slate-400 transition hover:text-rose-600"
+                  className="rounded p-1 text-slate-300 opacity-0 transition hover:bg-rose-50 hover:text-rose-600 focus-visible:opacity-100 group-hover:opacity-100"
                   disabled={busy}
                   aria-label={`Delete ${task.name}`}
                   onClick={() => onDelete(task)}
                 >
-                  <IconTrash className="h-4 w-4" />
+                  <IconTrash className="h-3.5 w-3.5" />
                 </button>
               </li>
             );

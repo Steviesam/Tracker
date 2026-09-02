@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { IconRefresh, IconSearch, IconUsers } from "@/components/icons";
+import { Avatar } from "@/components/campaigns/bits";
+import { IconClose, IconRefresh, IconSearch, IconUsers } from "@/components/icons";
 import { formatMetric } from "@/lib/format";
 import type { DirectoryCreator, Facets } from "@/lib/directory/types";
 
@@ -62,23 +63,25 @@ export default function AddInfluencers({ onAdd, onClose, busy }: Props) {
   }
 
   return (
-    <div className="card p-4">
+    <div className="animate-rise card p-4 ring-1 ring-indigo-500/10">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex gap-1 rounded-lg bg-slate-100 p-1">
+        <div className="segment">
           {(["directory", "paste"] as const).map((value) => (
             <button
               key={value}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
-                tab === value ? "bg-white text-slate-900 shadow-sm" : "text-slate-600"
-              }`}
+              className={`segment-item ${tab === value ? "segment-item-on" : ""}`}
               onClick={() => setTab(value)}
             >
               {value === "directory" ? "From Discovery" : "Paste handles or links"}
             </button>
           ))}
         </div>
-        <button className="btn-ghost" onClick={onClose}>
-          Close
+        <button
+          className="btn-ghost btn-sm text-slate-400 hover:text-slate-900"
+          aria-label="Close"
+          onClick={onClose}
+        >
+          <IconClose className="h-4 w-4" />
         </button>
       </div>
 
@@ -134,23 +137,28 @@ export default function AddInfluencers({ onAdd, onClose, busy }: Props) {
               <ul className="divide-y divide-slate-100">
                 {results.map((creator) => (
                   <li key={creator.username}>
-                    <label className="flex cursor-pointer items-center gap-3 px-3 py-2.5 hover:bg-slate-50">
+                    <label
+                      className={`flex cursor-pointer items-center gap-3 px-3 py-2 transition-colors ${
+                        picked.has(creator.username) ? "bg-indigo-50/60" : "hover:bg-slate-50"
+                      }`}
+                    >
                       <input
                         type="checkbox"
-                        className="h-4 w-4 rounded border-slate-300"
+                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                         checked={picked.has(creator.username)}
                         onChange={() => toggle(creator.username)}
                       />
+                      <Avatar name={creator.username} className="h-7 w-7 text-[10px]" />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">
+                        <span className="block truncate text-[13px] font-medium">
                           @{creator.username}
                         </span>
-                        <span className="block truncate text-xs text-slate-500">
+                        <span className="block truncate text-[11px] text-slate-500">
                           {[creator.city, creator.state].filter(Boolean).join(", ") ||
                             "Location unknown"}
                         </span>
                       </span>
-                      <span className="text-xs tabular-nums text-slate-600">
+                      <span className="text-[12px] font-medium tabular-nums text-slate-600">
                         {formatMetric(creator.followers)}
                       </span>
                     </label>

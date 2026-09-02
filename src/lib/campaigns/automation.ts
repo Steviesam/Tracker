@@ -9,10 +9,14 @@
 import { inDays } from "@/lib/campaigns/dates";
 import type { InfluencerStatus } from "@/lib/campaigns/status";
 
+/** Stored on the task. Money is owner-only, so a payment task has to be recognisable. */
+export type TaskKind = "GENERAL" | "PAYMENT";
+
 export type TaskTemplate = {
   name: string;
   /** Days from now, used only when the creator has no deadline of their own. */
   dueInDays: number;
+  kind: TaskKind;
 };
 
 /**
@@ -23,13 +27,13 @@ export type TaskTemplate = {
  * before a creator has agreed.
  */
 const ON_REACHING: Partial<Record<InfluencerStatus, TaskTemplate>> = {
-  CONFIRMED: { name: "Send brief", dueInDays: 2 },
-  CONTENT_PENDING: { name: "Review content", dueInDays: 3 },
-  APPROVED: { name: "Track publishing", dueInDays: 5 },
-  PUBLISHED: { name: "Collect analytics", dueInDays: 7 },
+  CONFIRMED: { name: "Send brief", dueInDays: 2, kind: "GENERAL" },
+  CONTENT_PENDING: { name: "Review content", dueInDays: 3, kind: "GENERAL" },
+  APPROVED: { name: "Track publishing", dueInDays: 5, kind: "GENERAL" },
+  PUBLISHED: { name: "Collect analytics", dueInDays: 7, kind: "GENERAL" },
   // The work being finished is not the same as the creator being paid, and paying is the
   // step that quietly gets forgotten once everyone has moved on to the next campaign.
-  COMPLETED: { name: "Release payment", dueInDays: 7 },
+  COMPLETED: { name: "Release payment", dueInDays: 7, kind: "PAYMENT" },
 };
 
 /**
@@ -40,7 +44,7 @@ const ON_REACHING: Partial<Record<InfluencerStatus, TaskTemplate>> = {
  * money already sent is exactly the noise that makes people stop trusting the list.
  */
 export function taskIsNeeded(template: TaskTemplate, settled: boolean): boolean {
-  return template.name !== "Release payment" || !settled;
+  return template.kind !== "PAYMENT" || !settled;
 }
 
 export function taskForStatus(status: InfluencerStatus): TaskTemplate | null {

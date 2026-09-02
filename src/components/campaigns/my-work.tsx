@@ -1,7 +1,7 @@
 "use client";
 
-import { IconAlert, IconCheck } from "@/components/icons";
 import { DueDate } from "@/components/campaigns/bits";
+import { IconAlert, IconBriefcase, IconCheck, IconClock } from "@/components/icons";
 import type { MyWork } from "@/lib/campaigns/types";
 
 type Props = {
@@ -20,10 +20,10 @@ type Props = {
 export default function MyWorkPanel({ work, onOpenCampaign, onComplete, busy }: Props) {
   if (!work) {
     return (
-      <div className="card space-y-2 p-4">
-        <div className="skeleton h-5 w-32" />
-        <div className="skeleton h-9 w-full" />
-        <div className="skeleton h-9 w-full" />
+      <div className="card space-y-2.5 p-4">
+        <div className="skeleton h-4 w-28" />
+        <div className="skeleton h-10 w-full" />
+        <div className="skeleton h-10 w-full" />
       </div>
     );
   }
@@ -32,47 +32,61 @@ export default function MyWorkPanel({ work, onOpenCampaign, onComplete, busy }: 
 
   return (
     <div className="card overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
-        <p className="text-sm font-semibold">My work</p>
-        <div className="flex flex-wrap gap-1.5">
+      <div className="card-head">
+        <div className="flex items-center gap-2">
+          <span className="grid h-6 w-6 place-items-center rounded-md bg-indigo-50 text-indigo-600">
+            <IconClock className="h-3.5 w-3.5" />
+          </span>
+          <p className="text-sm font-semibold">My work</p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5">
           {work.overdue.length > 0 ? (
-            <span className="chip bg-rose-50 text-rose-700 ring-rose-200">
+            <span className="chip bg-rose-50 text-rose-700 ring-rose-200/70">
               {work.overdue.length} overdue
             </span>
           ) : null}
           {work.dueToday.length > 0 ? (
-            <span className="chip bg-amber-50 text-amber-700 ring-amber-200">
+            <span className="chip bg-amber-50 text-amber-700 ring-amber-200/70">
               {work.dueToday.length} due today
             </span>
           ) : null}
-          <span className="chip bg-slate-100 text-slate-600 ring-slate-200">
-            {work.activeCampaigns} active {work.activeCampaigns === 1 ? "campaign" : "campaigns"}
+          <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+            <IconBriefcase className="h-3.5 w-3.5 text-slate-400" />
+            {work.activeCampaigns} active
           </span>
         </div>
       </div>
 
       {nothing ? (
-        <p className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-slate-500">
-          <IconCheck className="h-4 w-4 text-emerald-500" />
-          Nothing due today, and nothing late.
-        </p>
+        <div className="flex flex-col items-center gap-1.5 px-4 py-9 text-center">
+          <span className="grid h-9 w-9 place-items-center rounded-full bg-emerald-50 text-emerald-600">
+            <IconCheck className="h-4 w-4" />
+          </span>
+          <p className="text-sm font-medium text-slate-700">You are all clear.</p>
+          <p className="text-[13px] text-slate-500">Nothing due today, and nothing late.</p>
+        </div>
       ) : (
         <ul className="divide-y divide-slate-100">
           {[...work.overdue, ...work.dueToday].map((task) => (
-            <li key={task.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+            <li
+              key={task.id}
+              className="group flex flex-wrap items-center gap-3 px-4 py-2.5 transition-colors hover:bg-slate-50/70"
+            >
               <button
-                className="grid h-5 w-5 shrink-0 place-items-center rounded border border-slate-300 text-transparent transition hover:border-emerald-500 hover:text-emerald-600"
+                className="grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[6px] border border-slate-300 bg-white text-transparent transition hover:border-emerald-500 hover:bg-emerald-500 hover:text-white disabled:opacity-40"
                 disabled={busy}
                 title="Mark done"
+                aria-label={`Mark ${task.name} done`}
                 onClick={() => onComplete(task.campaign.id, task.id, task.name)}
               >
-                <IconCheck className="h-3.5 w-3.5" />
+                <IconCheck className="h-3 w-3" />
               </button>
 
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{task.name}</p>
+                <p className="truncate text-[13px] font-medium leading-tight">{task.name}</p>
                 <button
-                  className="text-xs text-slate-500 hover:text-indigo-600 hover:underline"
+                  className="mt-0.5 truncate text-[12px] leading-tight text-slate-500 transition-colors hover:text-indigo-600"
                   onClick={() => onOpenCampaign(task.campaign.id)}
                 >
                   {task.campaign.name}

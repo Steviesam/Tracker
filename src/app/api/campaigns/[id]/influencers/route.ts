@@ -11,9 +11,9 @@ import {
 } from "@/lib/campaigns/mutations";
 import { findCampaign } from "@/lib/campaigns/queries";
 import { INFLUENCER_STATUSES, PLATFORMS } from "@/lib/campaigns/status";
+import { denyMoney, requireViewer } from "@/lib/campaigns/viewer";
 import { firstIssue } from "@/lib/credentials";
 import { prisma } from "@/lib/db";
-import { requireSession } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +31,7 @@ const addSchema = z.object({
 });
 
 export async function POST(request: Request, context: Context) {
-  const auth = await requireSession();
+  const auth = await requireViewer();
   if (auth.response) return auth.response;
 
   const { id } = await context.params;
@@ -98,7 +98,7 @@ export async function POST(request: Request, context: Context) {
   return NextResponse.json({
     ...result,
     rejected,
-    campaign: await findCampaign(id),
+    campaign: await findCampaign(id, auth.viewer),
   });
 }
 
@@ -114,7 +114,7 @@ const patchSchema = z.object({
 });
 
 export async function PATCH(request: Request, context: Context) {
-  const auth = await requireSession();
+  const auth = await requireViewer();
   if (auth.response) return auth.response;
 
   const { id } = await context.params;
@@ -125,6 +125,11 @@ export async function PATCH(request: Request, context: Context) {
   } catch (error) {
     const message = error instanceof z.ZodError ? firstIssue(error) : "Check what you sent.";
     return NextResponse.json({ error: message }, { status: 400 });
+  }
+
+  // A member is never shown these boxes, so anything arriving in them was hand-made.
+  if ((input.agreedRate !== undefined || input.amountPaid !== undefined) && !auth.viewer.canSeeMoney) {
+    return denyMoney();
   }
 
   const influencer = await prisma.campaignInfluencer.findUnique({
@@ -169,11 +174,11 @@ export async function PATCH(request: Request, context: Context) {
     );
   }
 
-  return NextResponse.json({ campaign: await findCampaign(id) });
+  return NextResponse.json({ campaign: await findCampaign(id, auth.viewer) });
 }
 
 export async function DELETE(request: Request, context: Context) {
-  const auth = await requireSession();
+  const auth = await requireViewer();
   if (auth.response) return auth.response;
 
   const { id } = await context.params;
@@ -201,5 +206,5 @@ export async function DELETE(request: Request, context: Context) {
     );
   });
 
-  return NextResponse.json({ campaign: await findCampaign(id) });
+  return NextResponse.json({ campaign: await findCampaign(id, auth.viewer) });
 }

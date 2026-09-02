@@ -37,9 +37,9 @@ export default function LoginForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="mt-6 space-y-4">
+    <form onSubmit={onSubmit} className="mt-7 space-y-4">
       <div>
-        <label htmlFor="email" className="mb-1 block text-sm font-medium">
+        <label htmlFor="email" className="mb-1.5 block text-[13px] font-medium text-slate-700">
           Email
         </label>
         <input
@@ -47,6 +47,7 @@ export default function LoginForm() {
           type="email"
           required
           autoComplete="username"
+          placeholder="you@company.com"
           className="field"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
@@ -54,7 +55,7 @@ export default function LoginForm() {
       </div>
 
       <div>
-        <label htmlFor="password" className="mb-1 block text-sm font-medium">
+        <label htmlFor="password" className="mb-1.5 block text-[13px] font-medium text-slate-700">
           Password
         </label>
         <input
@@ -62,6 +63,7 @@ export default function LoginForm() {
           type="password"
           required
           autoComplete="current-password"
+          placeholder="••••••••"
           className="field"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
@@ -71,7 +73,7 @@ export default function LoginForm() {
       {error ? (
         <p
           role="alert"
-          className="animate-fade rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+          className="animate-fade rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[13px] text-rose-700"
         >
           {error}
         </p>

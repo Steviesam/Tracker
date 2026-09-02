@@ -16,6 +16,13 @@ import {
   type CampaignPlatform,
   type CampaignStatus,
 } from "@/lib/campaigns/status";
+import {
+  PAYMENT_TASK,
+  redactRate,
+  visibleActivity,
+  visibleTasks,
+  type Viewer,
+} from "@/lib/campaigns/visibility";
 import type {
   ActivityView,
   CampaignDetail,
@@ -52,6 +59,17 @@ type TaskRow = {
   influencer: { id: string; handle: string } | null;
 };
 
+/** Selected everywhere tasks are read, because every reader has to filter on it. */
+const TASK_SELECT = {
+  id: true,
+  name: true,
+  kind: true,
+  dueDate: true,
+  completedAt: true,
+  assignedTo: { select: { id: true, name: true, email: true } },
+  influencer: { select: { id: true, handle: true } },
+} as const;
+
 function toTaskView(task: TaskRow, now: Date): TaskView {
   return {
     id: task.id,
@@ -65,6 +83,7 @@ function toTaskView(task: TaskRow, now: Date): TaskView {
 }
 
 export async function listCampaigns(
+  viewer: Viewer,
   filters: { search?: string; status?: CampaignStatus } = {},
 ): Promise<CampaignSummary[]> {
   const now = new Date();
@@ -95,13 +114,14 @@ export async function listCampaigns(
       influencers: {
         select: { status: true, deadline: true, agreedRate: true, amountPaid: true },
       },
-      tasks: { select: { dueDate: true, completedAt: true } },
+      tasks: { select: { kind: true, dueDate: true, completedAt: true } },
     },
   });
 
   return campaigns.map((campaign) => {
     const influencers = countInfluencers(campaign.influencers, now);
-    const tasks = countTasks(campaign.tasks, now);
+    // Counted off the tasks this person is allowed to see, so the badge and the list agree.
+    const tasks = countTasks(visibleTasks(campaign.tasks, viewer), now);
     return {
       id: campaign.id,
       name: campaign.name,
@@ -113,12 +133,15 @@ export async function listCampaigns(
       influencers,
       tasks,
       progress: progressOf(influencers, tasks),
-      money: money(campaign.influencers, campaign.budget),
+      money: viewer.canSeeMoney ? money(campaign.influencers, campaign.budget) : null,
     };
   });
 }
 
-export async function findCampaign(id: string): Promise<CampaignDetail | null> {
+export async function findCampaign(
+  id: string,
+  viewer: Viewer,
+): Promise<CampaignDetail | null> {
   const now = new Date();
 
   const campaign = await prisma.campaign.findUnique({
@@ -152,14 +175,7 @@ export async function findCampaign(id: string): Promise<CampaignDetail | null> {
       },
       tasks: {
         orderBy: [{ completedAt: "asc" }, { dueDate: "asc" }],
-        select: {
-          id: true,
-          name: true,
-          dueDate: true,
-          completedAt: true,
-          assignedTo: { select: { id: true, name: true, email: true } },
-          influencer: { select: { id: true, handle: true } },
-        },
+        select: TASK_SELECT,
       },
       activities: {
         orderBy: { createdAt: "desc" },
@@ -187,9 +203,9 @@ export async function findCampaign(id: string): Promise<CampaignDetail | null> {
       followers: row.followers,
       engagementRate: row.engagementRate,
       statsCheckedAt: row.statsCheckedAt?.toISOString() ?? null,
-      agreedRate: row.agreedRate,
-      amountPaid: row.amountPaid,
-      payment: paymentState(row),
+      agreedRate: redactRate(row.agreedRate, viewer),
+      amountPaid: viewer.canSeeMoney ? row.amountPaid : null,
+      payment: viewer.canSeeMoney ? paymentState(row) : null,
       assignedTo: toPerson(row.assignedTo),
       status,
       deadline: row.deadline?.toISOString() ?? null,
@@ -197,9 +213,10 @@ export async function findCampaign(id: string): Promise<CampaignDetail | null> {
     };
   });
 
-  const tasks = campaign.tasks.map((task) => toTaskView(task, now));
+  const allowedTasks = visibleTasks(campaign.tasks, viewer);
+  const tasks = allowedTasks.map((task) => toTaskView(task, now));
 
-  const activity: ActivityView[] = campaign.activities.map((row) => ({
+  const activity: ActivityView[] = visibleActivity(campaign.activities, viewer).map((row) => ({
     id: row.id,
     kind: row.kind,
     message: row.message,
@@ -209,7 +226,7 @@ export async function findCampaign(id: string): Promise<CampaignDetail | null> {
 
   const counts = {
     influencers: countInfluencers(campaign.influencers, now),
-    tasks: countTasks(campaign.tasks, now),
+    tasks: countTasks(allowedTasks, now),
   };
 
   return {
@@ -219,7 +236,7 @@ export async function findCampaign(id: string): Promise<CampaignDetail | null> {
     brief: campaign.brief,
     startDate: campaign.startDate.toISOString(),
     endDate: campaign.endDate.toISOString(),
-    budget: campaign.budget,
+    budget: redactRate(campaign.budget, viewer),
     status: toCampaignStatus(campaign.status),
     manager: toPerson(campaign.manager),
     influencers,
@@ -227,7 +244,8 @@ export async function findCampaign(id: string): Promise<CampaignDetail | null> {
     activity,
     counts,
     progress: progressOf(counts.influencers, counts.tasks),
-    money: money(campaign.influencers, campaign.budget),
+    money: viewer.canSeeMoney ? money(campaign.influencers, campaign.budget) : null,
+    canSeeMoney: viewer.canSeeMoney,
   };
 }
 
@@ -238,21 +256,18 @@ export async function findCampaign(id: string): Promise<CampaignDetail | null> {
  * rather than in two queries, because both need the same Indian day boundary and running
  * them separately could straddle midnight.
  */
-export async function myWork(userId: string): Promise<MyWork> {
+export async function myWork(viewer: Viewer): Promise<MyWork> {
   const now = new Date();
 
   const tasks = await prisma.task.findMany({
-    where: { assignedToId: userId, completedAt: null },
-    orderBy: { dueDate: "asc" },
-    select: {
-      id: true,
-      name: true,
-      dueDate: true,
-      completedAt: true,
-      assignedTo: { select: { id: true, name: true, email: true } },
-      influencer: { select: { id: true, handle: true } },
-      campaign: { select: { id: true, name: true } },
+    where: {
+      assignedToId: viewer.id,
+      completedAt: null,
+      // A payment task assigned to a member is not shown to them, so it is not fetched.
+      ...(viewer.canSeeMoney ? {} : { kind: { not: PAYMENT_TASK } }),
     },
+    orderBy: { dueDate: "asc" },
+    select: { ...TASK_SELECT, campaign: { select: { id: true, name: true } } },
   });
 
   const activeCampaigns = await prisma.campaign.count({ where: { status: "ACTIVE" } });

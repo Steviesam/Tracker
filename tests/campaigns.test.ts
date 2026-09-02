@@ -12,6 +12,13 @@ import {
 import { displayHandle, normaliseHandle, parsePaste } from "@/lib/campaigns/handles";
 import { countInfluencers, countTasks, progressOf } from "@/lib/campaigns/progress";
 import { INFLUENCER_STATUSES, stageIndex, toInfluencerStatus } from "@/lib/campaigns/status";
+import { isMoneyActivity } from "@/lib/campaigns/activity";
+import {
+  redactRate,
+  visibleActivity,
+  visibleTasks,
+  type Viewer,
+} from "@/lib/campaigns/visibility";
 
 describe("Indian day boundaries", () => {
   it("rolls the date at Indian midnight, not at UTC midnight", () => {
@@ -166,20 +173,20 @@ describe("automation", () => {
   it("uses the influencer's own deadline when it is still ahead", () => {
     const now = new Date("2026-09-10T06:00:00Z");
     const deadline = fromDayInput("2026-09-15")!;
-    expect(dueDateFor({ name: "Send brief", dueInDays: 2 }, deadline, now)).toEqual(deadline);
+    expect(dueDateFor({ name: "Send brief", dueInDays: 2, kind: "GENERAL" }, deadline, now)).toEqual(deadline);
   });
 
   it("ignores a deadline that has already gone, rather than creating a late task", () => {
     const now = new Date("2026-09-10T06:00:00Z");
     const stale = fromDayInput("2026-09-01")!;
-    const due = dueDateFor({ name: "Send brief", dueInDays: 2 }, stale, now);
+    const due = dueDateFor({ name: "Send brief", dueInDays: 2, kind: "GENERAL" }, stale, now);
     expect(isPastDue(due, now)).toBe(false);
     expect(daysFromToday(due, now)).toBe(2);
   });
 
   it("falls back to the template's own spacing when there is no deadline", () => {
     const now = new Date("2026-09-10T06:00:00Z");
-    expect(daysFromToday(dueDateFor({ name: "x", dueInDays: 7 }, null, now), now)).toBe(7);
+    expect(daysFromToday(dueDateFor({ name: "x", dueInDays: 7, kind: "GENERAL" }, null, now), now)).toBe(7);
   });
 });
 
@@ -313,5 +320,51 @@ describe("stages", () => {
   it("falls back to the first stage for a value we no longer recognise", () => {
     expect(toInfluencerStatus("NEGOTIATING")).toBe("SELECTED");
     expect(toInfluencerStatus("PUBLISHED")).toBe("PUBLISHED");
+  });
+});
+
+describe("who may see the money", () => {
+  const owner: Viewer = { id: "owner", canSeeMoney: true };
+  const member: Viewer = { id: "member", canSeeMoney: false };
+
+  const tasks = [
+    { kind: "GENERAL", name: "Send brief" },
+    { kind: "PAYMENT", name: "Release payment" },
+  ];
+
+  it("keeps payment tasks from a member and shows them to an owner", () => {
+    expect(visibleTasks(tasks, owner)).toHaveLength(2);
+    expect(visibleTasks(tasks, member).map((task) => task.name)).toEqual(["Send brief"]);
+  });
+
+  it("hides every line of history about money, by its prefix rather than by a list", () => {
+    const history = [
+      { kind: "status_changed" },
+      { kind: "payment_recorded" },
+      { kind: "payment_task_added" },
+      { kind: "payment_task_completed" },
+      { kind: "task_completed" },
+    ];
+    expect(visibleActivity(history, owner)).toHaveLength(5);
+    expect(visibleActivity(history, member).map((row) => row.kind)).toEqual([
+      "status_changed",
+      "task_completed",
+    ]);
+
+    // The rule is the prefix, so a kind invented later is hidden by being named for money.
+    expect(isMoneyActivity("payment_reversed")).toBe(true);
+    expect(isMoneyActivity("influencer_added")).toBe(false);
+  });
+
+  it("withholds a rate rather than reporting it as zero", () => {
+    // Zero would read as "agreed nothing", which is a different and wrong claim.
+    expect(redactRate(50_000, owner)).toBe(50_000);
+    expect(redactRate(50_000, member)).toBeNull();
+    expect(redactRate(null, owner)).toBeNull();
+  });
+
+  it("marks the payment task as payment, so it is never matched on its name", () => {
+    expect(taskForStatus("COMPLETED")?.kind).toBe("PAYMENT");
+    expect(taskForStatus("CONFIRMED")?.kind).toBe("GENERAL");
   });
 });

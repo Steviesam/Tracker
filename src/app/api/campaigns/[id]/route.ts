@@ -6,7 +6,7 @@ import { findCampaign } from "@/lib/campaigns/queries";
 import { CAMPAIGN_STATUS_LABEL, CAMPAIGN_STATUSES } from "@/lib/campaigns/status";
 import { firstIssue } from "@/lib/credentials";
 import { prisma } from "@/lib/db";
-import { requireSession } from "@/lib/session";
+import { denyMoney, requireViewer } from "@/lib/campaigns/viewer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,11 +14,11 @@ export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ id: string }> };
 
 export async function GET(_request: Request, context: Context) {
-  const auth = await requireSession();
+  const auth = await requireViewer();
   if (auth.response) return auth.response;
 
   const { id } = await context.params;
-  const campaign = await findCampaign(id);
+  const campaign = await findCampaign(id, auth.viewer);
   if (!campaign) return NextResponse.json({ error: "No such campaign." }, { status: 404 });
 
   return NextResponse.json({ campaign });
@@ -36,7 +36,7 @@ const patchSchema = z.object({
 });
 
 export async function PATCH(request: Request, context: Context) {
-  const auth = await requireSession();
+  const auth = await requireViewer();
   if (auth.response) return auth.response;
 
   const { id } = await context.params;
@@ -48,6 +48,8 @@ export async function PATCH(request: Request, context: Context) {
     const message = error instanceof z.ZodError ? firstIssue(error) : "Check the details you entered.";
     return NextResponse.json({ error: message }, { status: 400 });
   }
+
+  if (input.budget !== undefined && !auth.viewer.canSeeMoney) return denyMoney();
 
   const existing = await prisma.campaign.findUnique({
     where: { id },
@@ -94,11 +96,11 @@ export async function PATCH(request: Request, context: Context) {
     );
   }
 
-  return NextResponse.json({ campaign: await findCampaign(id) });
+  return NextResponse.json({ campaign: await findCampaign(id, auth.viewer) });
 }
 
 export async function DELETE(_request: Request, context: Context) {
-  const auth = await requireSession();
+  const auth = await requireViewer();
   if (auth.response) return auth.response;
 
   const { id } = await context.params;

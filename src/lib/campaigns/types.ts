@@ -23,7 +23,8 @@ export type CampaignSummary = {
   tasks: TaskCounts;
   /** Whole percent, worked out from the rows. Never typed in. */
   progress: number;
-  money: Money;
+  /** Null for anyone but an owner — the figures are not sent, not merely not drawn. */
+  money: Money | null;
 };
 
 export type CampaignInfluencerView = {
@@ -35,10 +36,11 @@ export type CampaignInfluencerView = {
   engagementRate: number | null;
   /** Null when the numbers were never looked up. */
   statsCheckedAt: string | null;
+  /** Null for anyone but an owner, as is every other figure on this row. */
   agreedRate: number | null;
-  amountPaid: number;
-  /** Worked out from the two figures above, never stored. */
-  payment: PaymentState;
+  amountPaid: number | null;
+  /** Worked out from the two figures above, never stored. Null when they were withheld. */
+  payment: PaymentState | null;
   assignedTo: Person | null;
   status: InfluencerStatus;
   deadline: string | null;
@@ -81,7 +83,9 @@ export type CampaignDetail = {
   activity: ActivityView[];
   counts: { influencers: InfluencerCounts; tasks: TaskCounts };
   progress: number;
-  money: Money;
+  money: Money | null;
+  /** What this reader is allowed to see, so the screens do not have to guess. */
+  canSeeMoney: boolean;
 };
 
 /** The landing view: what is on me today, and which campaigns are running. */

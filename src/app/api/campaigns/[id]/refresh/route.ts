@@ -4,7 +4,7 @@ import { refreshStats } from "@/lib/campaigns/mutations";
 import { findCampaign } from "@/lib/campaigns/queries";
 import { creatorStatsAvailable } from "@/lib/creators";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
-import { requireSession } from "@/lib/session";
+import { requireViewer } from "@/lib/campaigns/viewer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +17,7 @@ type Context = { params: Promise<{ id: string }> };
 const MAX_AT_ONCE = 20;
 
 export async function POST(request: Request, context: Context) {
-  const auth = await requireSession();
+  const auth = await requireViewer();
   if (auth.response) return auth.response;
 
   if (!creatorStatsAvailable()) {
@@ -52,5 +52,5 @@ export async function POST(request: Request, context: Context) {
 
   const updated = await refreshStats(ids);
 
-  return NextResponse.json({ updated, campaign: await findCampaign(id) });
+  return NextResponse.json({ updated, campaign: await findCampaign(id, auth.viewer) });
 }

@@ -258,21 +258,26 @@ export default function Dashboard({
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 lg:flex">
-      <aside className="border-b border-slate-800 bg-slate-900 text-slate-300 lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:shrink-0 lg:flex-col lg:border-b-0">
-        <div className="flex items-center gap-2.5 px-5 py-4">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 text-white">
-            <IconChart className="h-4 w-4" />
+    <div className="min-h-screen lg:flex">
+      <aside className="z-30 border-b border-white/5 bg-ink-950 text-slate-300 lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-[248px] lg:shrink-0 lg:flex-col lg:border-b-0 lg:border-r lg:border-black/40">
+        <div className="flex items-center gap-2.5 px-4 py-4 lg:px-5">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-950/40 ring-1 ring-inset ring-white/20">
+            <IconChart className="h-[18px] w-[18px]" />
           </span>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-white">Social Metrics</p>
-            <p className="truncate text-xs text-slate-400" title={email}>
-              {name}
+            <p className="truncate text-[13px] font-semibold leading-tight text-white">
+              Social Metrics
+            </p>
+            <p className="truncate text-[11px] leading-tight text-slate-500">
+              Influencer operations
             </p>
           </div>
         </div>
 
         <nav className="px-3 pb-3 lg:flex-1">
+          <p className="mb-1.5 hidden px-2 text-[10px] font-semibold uppercase tracking-[0.09em] text-slate-600 lg:block">
+            Workspace
+          </p>
           <ul className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
             {sections.map((item) => {
               const selected = item.id === section;
@@ -282,10 +287,10 @@ export default function Dashboard({
               return (
                 <li key={item.id} className="lg:w-full">
                   <button
-                    className={`relative flex w-full items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm font-medium transition-all duration-150 ${
+                    className={`group relative flex w-full items-center gap-2.5 whitespace-nowrap rounded-lg px-2.5 py-2 text-left text-[13px] font-medium transition-colors duration-150 ${
                       selected
-                        ? "bg-slate-800 text-white shadow-sm"
-                        : "text-slate-400 hover:bg-slate-800/60 hover:text-white"
+                        ? "bg-white/[0.07] text-white"
+                        : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-100"
                     }`}
                     aria-current={selected ? "page" : undefined}
                     onClick={() => selectSection(item.id)}
@@ -293,17 +298,21 @@ export default function Dashboard({
                     {selected ? (
                       <span
                         aria-hidden="true"
-                        className="absolute inset-y-1.5 left-0 hidden w-0.5 rounded-full bg-indigo-400 lg:block"
+                        className="absolute inset-y-1.5 -left-3 hidden w-[3px] rounded-r-full bg-indigo-400 lg:block"
                       />
                     ) : null}
                     <Icon
-                      className={`h-4 w-4 shrink-0 ${selected ? "text-indigo-400" : "text-slate-500"}`}
+                      className={`h-[17px] w-[17px] shrink-0 transition-colors ${
+                        selected ? "text-indigo-400" : "text-slate-500 group-hover:text-slate-400"
+                      }`}
                     />
                     <span className="flex-1">{item.label}</span>
                     {badge ? (
                       <span
-                        className={`rounded px-1.5 py-0.5 text-xs tabular-nums ${
-                          selected ? "bg-indigo-500/20 text-indigo-300" : "bg-slate-800 text-slate-400"
+                        className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums ${
+                          selected
+                            ? "bg-indigo-500/20 text-indigo-300"
+                            : "bg-white/[0.06] text-slate-400"
                         }`}
                       >
                         {badge}
@@ -316,89 +325,109 @@ export default function Dashboard({
           </ul>
         </nav>
 
-        <div className="hidden px-3 pb-4 lg:block">
-          <button
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:bg-slate-800/60 hover:text-white"
-            onClick={onSignOut}
-          >
-            <IconLogout className="h-4 w-4" />
-            Sign out
-          </button>
+        {/* The account sits at the foot of the rail, where people look for it, and signing
+            out is an icon beside it rather than a nav item pretending to be a place. */}
+        <div className="hidden p-3 lg:block">
+          <div className="flex items-center gap-2.5 rounded-lg bg-white/[0.04] px-2.5 py-2 ring-1 ring-inset ring-white/[0.06]">
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gradient-to-br from-slate-600 to-slate-700 text-[11px] font-semibold text-white">
+              {name.slice(0, 1).toUpperCase()}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[12px] font-medium leading-tight text-slate-200">{name}</p>
+              <p className="truncate text-[11px] leading-tight text-slate-500" title={email}>
+                {email}
+              </p>
+            </div>
+            <button
+              className="shrink-0 rounded-md p-1.5 text-slate-500 transition-colors hover:bg-white/[0.06] hover:text-slate-200"
+              title="Sign out"
+              aria-label="Sign out"
+              onClick={onSignOut}
+            >
+              <IconLogout className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">
-        <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">{active.label}</h1>
-            <p className="mt-0.5 text-sm text-slate-500">{active.description}</p>
+      <div className="min-w-0 flex-1">
+        <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-canvas/80 backdrop-blur-md">
+          <div className="mx-auto flex max-w-[1360px] flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-6 lg:px-8">
+            <div className="min-w-0">
+              <h1 className="text-[15px] font-semibold leading-tight">{active.label}</h1>
+              <p className="mt-0.5 truncate text-[13px] leading-tight text-slate-500">
+                {active.description}
+              </p>
+            </div>
+            <button className="btn-secondary btn-sm lg:hidden" onClick={onSignOut}>
+              <IconLogout className="h-3.5 w-3.5" />
+              Sign out
+            </button>
           </div>
-          <button className="btn-secondary lg:hidden" onClick={onSignOut}>
-            <IconLogout className="h-4 w-4" />
-            Sign out
-          </button>
         </header>
 
-        {unconfigured.length > 0 && (section === "links" || section === "engagement") ? (
-          <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            <IconAlert className="mt-0.5 h-4 w-4 shrink-0" />
-            <p>
-              <strong>
-                No data provider configured for{" "}
-                {unconfigured.map((item) => PLATFORM_LABEL[item.platform]).join(", ")}.
-              </strong>{" "}
-              Those links return N/A with a reason. Metrics are never estimated.
-            </p>
-          </div>
-        ) : null}
+        <main className="mx-auto min-w-0 max-w-[1360px] px-4 py-5 sm:px-6 lg:px-8 lg:py-6">
+          {unconfigured.length > 0 && (section === "links" || section === "engagement") ? (
+            <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-200/80 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-xs">
+              <IconAlert className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>
+                <strong>
+                  No data provider configured for{" "}
+                  {unconfigured.map((item) => PLATFORM_LABEL[item.platform]).join(", ")}.
+                </strong>{" "}
+                Those links return N/A with a reason. Metrics are never estimated.
+              </p>
+            </div>
+          ) : null}
 
-        {section === "campaigns" ? (
-          <CampaignsSection
-            meId={meId}
-            openCampaignId={openCampaignId}
-            onOpenCampaign={openCampaign}
-            onNotify={notify}
-          />
-        ) : section === "links" ? (
-          <LinksSection
-            summary={summary}
-            results={results}
-            lastRefreshedAt={lastRefreshedAt}
-            busy={busy}
-            onUpload={(file) => {
-              const form = new FormData();
-              form.append("file", file);
-              void startDetection("upload", () =>
-                fetch("/api/upload", { method: "POST", body: form }),
-              );
-            }}
-            onPaste={(text) =>
-              void startDetection("paste", () =>
-                fetch("/api/urls", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ text }),
-                }),
-              )
-            }
-            onFetch={(kind) => void runFetch(kind)}
-          />
-        ) : section === "engagement" ? (
-          <CreatorsSection
-            results={results}
-            stats={creatorCards}
-            available={creatorStatsAvailable}
-            busy={busy}
-            onFetch={() => void loadCreatorStats()}
-            onLookUp={(text) => void loadCreatorStats(text)}
-            onGoToLinks={() => selectSection("links")}
-          />
-        ) : section === "discovery" ? (
-          <DiscoverySection onError={setError} />
-        ) : isOwner ? (
-          <AccessSection email={email} onError={setError} />
-        ) : null}
-      </main>
+          {section === "campaigns" ? (
+            <CampaignsSection
+              meId={meId}
+              openCampaignId={openCampaignId}
+              onOpenCampaign={openCampaign}
+              onNotify={notify}
+            />
+          ) : section === "links" ? (
+            <LinksSection
+              summary={summary}
+              results={results}
+              lastRefreshedAt={lastRefreshedAt}
+              busy={busy}
+              onUpload={(file) => {
+                const form = new FormData();
+                form.append("file", file);
+                void startDetection("upload", () =>
+                  fetch("/api/upload", { method: "POST", body: form }),
+                );
+              }}
+              onPaste={(text) =>
+                void startDetection("paste", () =>
+                  fetch("/api/urls", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ text }),
+                  }),
+                )
+              }
+              onFetch={(kind) => void runFetch(kind)}
+            />
+          ) : section === "engagement" ? (
+            <CreatorsSection
+              results={results}
+              stats={creatorCards}
+              available={creatorStatsAvailable}
+              busy={busy}
+              onFetch={() => void loadCreatorStats()}
+              onLookUp={(text) => void loadCreatorStats(text)}
+              onGoToLinks={() => selectSection("links")}
+            />
+          ) : section === "discovery" ? (
+            <DiscoverySection onError={setError} />
+          ) : isOwner ? (
+            <AccessSection email={email} onError={setError} />
+          ) : null}
+        </main>
+      </div>
 
       <Toast notice={notice} onDismiss={clearNotice} />
     </div>

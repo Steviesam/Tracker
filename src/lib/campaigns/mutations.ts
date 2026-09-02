@@ -16,6 +16,7 @@ import {
   type CampaignPlatform,
   type InfluencerStatus,
 } from "@/lib/campaigns/status";
+import { PAYMENT_TASK } from "@/lib/campaigns/visibility";
 import { prisma } from "@/lib/db";
 import { creatorKey, fetchStatsFor } from "@/lib/creators";
 import type { Platform } from "@/lib/types";
@@ -152,9 +153,14 @@ export async function changeStatus(
         campaignId: influencer.campaignId,
         influencerId,
         name: `${template.name} — ${influencer.handle}`,
-        // Whoever owns the creator owns the work. Falling back to the manager means a
-        // generated task is never left with nobody to do it.
-        assignedToId: influencer.assignedToId ?? influencer.campaign.managerId,
+        kind: template.kind,
+        // Whoever owns the creator owns the work — except for paying them, which is the
+        // owner's job and is assigned to whoever runs the campaign. Falling back to the
+        // manager means a generated task is never left with nobody to do it.
+        assignedToId:
+          template.kind === "PAYMENT"
+            ? influencer.campaign.managerId
+            : (influencer.assignedToId ?? influencer.campaign.managerId),
         dueDate: dueDateFor(template, influencer.deadline),
       },
     });
@@ -164,7 +170,7 @@ export async function changeStatus(
       tx,
       influencer.campaignId,
       actorId,
-      "task_added",
+      template.kind === "PAYMENT" ? "payment_task_added" : "task_added",
       `${template.name} created for ${influencer.handle} after ${INFLUENCER_STATUS_LABEL[next]}`,
     );
   });
@@ -216,7 +222,7 @@ export async function recordPayment(
 
     if (settled) {
       await tx.task.updateMany({
-        where: { influencerId, name: { startsWith: "Release payment" }, completedAt: null },
+        where: { influencerId, kind: PAYMENT_TASK, completedAt: null },
         data: { completedAt: new Date() },
       });
     }
@@ -226,7 +232,7 @@ export async function recordPayment(
 export async function completeTask(taskId: string, actorId: string, actorName: string) {
   const task = await prisma.task.findUnique({
     where: { id: taskId },
-    select: { id: true, campaignId: true, name: true, completedAt: true },
+    select: { id: true, campaignId: true, name: true, kind: true, completedAt: true },
   });
   if (!task) throw new Error("That task no longer exists.");
   if (task.completedAt) return;
@@ -237,7 +243,9 @@ export async function completeTask(taskId: string, actorId: string, actorName: s
       tx,
       task.campaignId,
       actorId,
-      "task_completed",
+      // Ticking off a payment is still a line about money, and belongs behind the same door
+      // as the amount itself.
+      task.kind === PAYMENT_TASK ? "payment_task_completed" : "task_completed",
       `${actorName} completed ${task.name}`,
     );
   });
