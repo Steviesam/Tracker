@@ -15,7 +15,7 @@ const DUMMY_HASH = "$2a$12$hanI/mHGisQ3XQ1PLEa6/.XJ/emxZ.fzyC4/RM8zobnL8d2GnW3lG
 
 // SECURITY REVIEW REQUIRED — AI-generated change to security-critical code
 export async function POST(request: Request) {
-  const limit = rateLimit(`login:${clientIp(request)}`, 10, 15 * 60 * 1000);
+  const limit = await rateLimit(`login:${clientIp(request)}`, 10, 15 * 60 * 1000);
   if (!limit.allowed) {
     return NextResponse.json(
       { error: "Too many sign-in attempts. Try again later." },

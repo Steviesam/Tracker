@@ -376,29 +376,59 @@ second figure to reconcile.
 Users live in Postgres (`User` table). Passwords are bcrypt hashes at cost 12; plaintext is
 never stored or logged.
 
-- **Signup is open** — anyone who can reach the app can register. Put it behind SSO, a VPN,
-  or a domain allowlist before exposing it.
+- **Signup is invite-only.** The first account to sign up claims the deployment and becomes
+  its owner. After that, an email has to be on the owner's list or signup is refused.
 - **Passwords** must be at least 12 characters, enforced server-side.
-- **Rate limits**: 5 signups per IP per hour, 10 logins per IP per 15 minutes. These are
-  in-process, so they protect one instance only — see the `x-forwarded-for` caveat in
-  `src/lib/rate-limit.ts`.
+- **Rate limits**: 5 signups per IP per hour, 10 logins per IP per 15 minutes, counted in
+  Postgres so the limit means one thing across every instance — see the `x-forwarded-for`
+  caveat in `src/lib/rate-limit.ts`.
 - **No account enumeration**: wrong password and unknown email return the same message and
   take the same time.
 - **Sessions** are signed cookies (HMAC-SHA256, `httpOnly`, `sameSite=lax`, `secure` in
   production, 12h expiry). Results are keyed by session, so users never see each other's data.
 
-There are no roles.
+### Who can get in
+
+The **Access** section in the sidebar is the owner's list, and only the owner can see it.
+Anyone else who requests `/api/access` gets a 404, because to them it does not exist.
+
+- **Invite** adds an email. That person can then sign up, with a password of their own
+  choosing — nothing is emailed, so tell them yourself.
+- **Remove** deletes their account and ends their session on their next request, rather
+  than at the end of the twelve hours their cookie would otherwise have left. They cannot
+  sign up again unless you invite them once more.
+- The owner cannot remove themselves, so a deployment can never end up with nobody in
+  charge.
+
+The list also shows accounts that existed before this was added, marked as already signed
+up, so it is a complete picture of who can get in rather than only of later arrivals.
+
+**On an existing deployment**, the migration makes the earliest account the owner. If that
+is not you, promote yourself directly:
+
+```sql
+UPDATE "User" SET role = 'OWNER' WHERE email = 'you@example.com';
+UPDATE "User" SET role = 'MEMBER' WHERE email = 'someone.else@example.com';
+```
+
+### What this does not do
+
+Worth knowing before treating it as hardened: there is no two-factor authentication, no
+password reset, and no audit log of who looked at what. An invited person has the same
+access to the directory and the provider budget as the owner — the only thing reserved to
+the owner is the guest list.
 
 ## Architecture
 
 ```
-prisma/schema.prisma       User + Creator (directory) + WorkSession tables
+prisma/schema.prisma       User + Invite + RateLimit + Creator + WorkSession tables
 src/
   app/
     signup/ login/         Auth pages
-    dashboard/             Metrics | Engagement | Discovery
+    dashboard/             Metrics | Engagement | Discovery | Access (owner)
     api/
       auth/…               Signup, login, logout
+      access               The owner's invite list
       upload               Scan a workbook, detect links
       urls                 Direct pasted-URL input
       process              Fetch metrics (also serves "Refresh All")
@@ -416,6 +446,7 @@ src/
     providers/             youtube | instagram | facebook | public-data
     creators/              Account-level averages and engagement rate
     directory/             Column mapping, normalisation, import, query
+    access.ts              Who may sign up, and who is the owner
     store.ts               Per-login Metrics/Engagement work (Postgres)
     export.ts              CSV + XLSX writers
 ```
@@ -570,6 +601,25 @@ npm run db:studio    # browse the database
 
 npm run import:creators -- sheet.xlsx   # load a sheet without the browser
 ```
+
+### A separate database for the tests
+
+Most of the suite is pure functions. A few — the rate limiter's shared counter, the signup
+gate — are only meaningful against a real database, and they empty the tables they use to
+test what a fresh deployment does. So `npm test` rewrites `DATABASE_URL` to the same
+database with `_test` on the end before anything connects, which is what stops it deleting
+the account you sign in with locally. Create it once:
+
+```bash
+docker exec -i social-metrics-postgres psql -U tracker -d social_metrics \
+  -c "CREATE DATABASE social_metrics_test"
+DATABASE_URL="postgresql://tracker:tracker_local_dev@localhost:5434/social_metrics_test" \
+DIRECT_DATABASE_URL="postgresql://tracker:tracker_local_dev@localhost:5434/social_metrics_test" \
+  npx prisma migrate deploy
+```
+
+Skip it and those tests skip themselves; the rest still run. `TEST_DATABASE_URL` overrides
+the name if you want it somewhere else.
 
 ### Importing a large sheet
 

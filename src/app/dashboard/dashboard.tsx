@@ -2,16 +2,24 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import AccessSection from "@/components/dashboard/access-section";
 import CreatorsSection from "@/components/dashboard/creators-section";
 import DiscoverySection from "@/components/dashboard/discovery-section";
 import LinksSection, { type BusyKind } from "@/components/dashboard/links-section";
-import { IconAlert, IconChart, IconCompass, IconLogout, IconSpark } from "@/components/icons";
+import {
+  IconAlert,
+  IconChart,
+  IconCompass,
+  IconKey,
+  IconLogout,
+  IconSpark,
+} from "@/components/icons";
 import Toast from "@/components/toast";
 import type { PlatformReadiness } from "@/lib/metrics";
 import {
   DEFAULT_SECTION,
-  SECTIONS,
   sectionById,
+  sectionsFor,
   toSectionId,
   type SectionId,
 } from "@/lib/sections";
@@ -25,6 +33,8 @@ import {
 type Props = {
   name: string;
   email: string;
+  /** Only the owner sees Access; the API refuses it regardless of what the nav shows. */
+  isOwner: boolean;
   readiness: PlatformReadiness[];
   creatorStatsAvailable: boolean;
   /** Read from the URL on the server, so a reload opens the section the user was on. */
@@ -66,11 +76,13 @@ const SECTION_ICON: Record<SectionId, (p: { className?: string }) => React.React
   links: IconChart,
   engagement: IconSpark,
   discovery: IconCompass,
+  access: IconKey,
 };
 
 export default function Dashboard({
   name,
   email,
+  isOwner,
   readiness,
   creatorStatsAvailable,
   initialSection,
@@ -187,6 +199,7 @@ export default function Dashboard({
   const unconfigured = readiness.filter((item) => !item.configured);
   const creatorCards = Object.values(creatorStats);
   const active = sectionById(section);
+  const sections = sectionsFor(isOwner);
 
   // Discovery has no badge: its count is the whole directory, not something loaded here.
   const badgeFor = (id: SectionId) => {
@@ -212,7 +225,7 @@ export default function Dashboard({
 
         <nav className="px-3 pb-3 lg:flex-1">
           <ul className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
-            {SECTIONS.map((item) => {
+            {sections.map((item) => {
               const selected = item.id === section;
               const Icon = SECTION_ICON[item.id];
               const badge = badgeFor(item.id);
@@ -277,7 +290,7 @@ export default function Dashboard({
           </button>
         </header>
 
-        {unconfigured.length > 0 && section !== "discovery" ? (
+        {unconfigured.length > 0 && (section === "links" || section === "engagement") ? (
           <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             <IconAlert className="mt-0.5 h-4 w-4 shrink-0" />
             <p>
@@ -324,9 +337,11 @@ export default function Dashboard({
             onLookUp={(text) => void loadCreatorStats(text)}
             onGoToLinks={() => selectSection("links")}
           />
-        ) : (
+        ) : section === "discovery" ? (
           <DiscoverySection onError={setError} />
-        )}
+        ) : isOwner ? (
+          <AccessSection email={email} onError={setError} />
+        ) : null}
       </main>
 
       <Toast message={error} onDismiss={() => setError(null)} />

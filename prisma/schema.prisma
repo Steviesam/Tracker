@@ -20,11 +20,61 @@ model User {
   name         String
   /// bcrypt hash. The plaintext password is never stored or logged.
   passwordHash String
+  /// `OWNER` or `MEMBER`. The first account to sign up owns the deployment; only an owner
+  /// can invite, which is what keeps signup closed without a password in an env var.
+  role         String   @default("MEMBER")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   lastLoginAt  DateTime?
 
+  invitesSent Invite[] @relation("InvitedBy")
+
   @@index([email])
+}
+
+/**
+ * An email the owner has allowed to sign up.
+ *
+ * Signup is otherwise closed. Without this, anyone who finds the URL can create an account
+ * and spend the deployment's provider credits — the app has no other barrier, since it
+ * reports on public data and needs no per-user credentials.
+ *
+ * The row is kept after the account exists rather than deleted, so the owner can see who
+ * was let in and revoke a future re-signup.
+ */
+model Invite {
+  id String @id @default(cuid())
+
+  /// Lowercased and trimmed, matching User.email, so the comparison cannot miss.
+  email String @unique
+
+  invitedBy   User?   @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
+  invitedById String?
+
+  /// Set when the invited person actually signs up, so the list shows who is still pending.
+  acceptedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+
+/**
+ * One rate-limit window.
+ *
+ * In-process counters are useless on a serverless host: every instance keeps its own map,
+ * so "five signups an hour" becomes five per instance per hour, and a password guesser
+ * simply gets spread across instances. This is the same database the app already needs,
+ * which is enough for the traffic a tool like this sees.
+ */
+model RateLimit {
+  /// The thing being limited, e.g. `login:203.0.113.4`.
+  key String @id
+
+  count   Int
+  resetAt DateTime
+
+  @@index([resetAt])
 }
 
 /**

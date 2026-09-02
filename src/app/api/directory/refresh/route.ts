@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
   const auth = await requireSession();
   if (auth.response) return auth.response;
 
-  const limit = rateLimit(`directory-refresh:${clientIp(request)}`, 40, 15 * 60 * 1000);
+  const limit = await rateLimit(`directory-refresh:${clientIp(request)}`, 40, 15 * 60 * 1000);
   if (!limit.allowed) {
     return NextResponse.json(
       { error: `Too many refreshes. Try again in ${limit.retryAfter} seconds.` },

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { loginSchema, signupSchema, MIN_PASSWORD_LENGTH } from "@/lib/credentials";
+import { databaseReachable } from "./helpers/database";
 import { rateLimit } from "@/lib/rate-limit";
 
 describe("signupSchema", () => {
@@ -35,30 +36,42 @@ describe("loginSchema", () => {
   });
 });
 
-describe("rateLimit", () => {
-  it("allows up to the limit then blocks", () => {
+// The limiter counts in Postgres, so these need a database. Skipped rather than failed
+// when there is none, so `npm test` still runs for someone who has not started Docker.
+describe.runIf(await databaseReachable())("rateLimit", () => {
+  it("allows up to the limit then blocks", async () => {
     const key = `test-${Math.random()}`;
     for (let i = 0; i < 3; i += 1) {
-      expect(rateLimit(key, 3, 60_000).allowed).toBe(true);
+      expect((await rateLimit(key, 3, 60_000)).allowed).toBe(true);
     }
-    const blocked = rateLimit(key, 3, 60_000);
+    const blocked = await rateLimit(key, 3, 60_000);
     expect(blocked.allowed).toBe(false);
     expect(blocked.retryAfter).toBeGreaterThan(0);
   });
 
-  it("tracks keys independently", () => {
+  it("tracks keys independently", async () => {
     const a = `a-${Math.random()}`;
     const b = `b-${Math.random()}`;
-    rateLimit(a, 1, 60_000);
-    expect(rateLimit(a, 1, 60_000).allowed).toBe(false);
-    expect(rateLimit(b, 1, 60_000).allowed).toBe(true);
+    await rateLimit(a, 1, 60_000);
+    expect((await rateLimit(a, 1, 60_000)).allowed).toBe(false);
+    expect((await rateLimit(b, 1, 60_000)).allowed).toBe(true);
   });
 
   it("resets once the window expires", async () => {
     const key = `reset-${Math.random()}`;
-    expect(rateLimit(key, 1, 30).allowed).toBe(true);
-    expect(rateLimit(key, 1, 30).allowed).toBe(false);
+    expect((await rateLimit(key, 1, 30)).allowed).toBe(true);
+    expect((await rateLimit(key, 1, 30)).allowed).toBe(false);
     await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(rateLimit(key, 1, 30).allowed).toBe(true);
+    expect((await rateLimit(key, 1, 30)).allowed).toBe(true);
+  });
+
+  it("counts a shared key across callers, which is the point of storing it", async () => {
+    const key = `shared-${Math.random()}`;
+    const results = await Promise.all([
+      rateLimit(key, 2, 60_000),
+      rateLimit(key, 2, 60_000),
+      rateLimit(key, 2, 60_000),
+    ]);
+    expect(results.filter((result) => result.allowed)).toHaveLength(2);
   });
 });

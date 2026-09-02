@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { hash } from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
+import { decideSignup } from "@/lib/access";
 import { createSessionToken, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth";
 import { firstIssue, signupSchema } from "@/lib/credentials";
 import { prisma } from "@/lib/db";
@@ -13,8 +14,9 @@ const BCRYPT_COST = 12;
 
 // SECURITY REVIEW REQUIRED — AI-generated change to security-critical code
 export async function POST(request: Request) {
-  // Signup is open, so cap account creation per IP.
-  const limit = rateLimit(`signup:${clientIp(request)}`, 5, 60 * 60 * 1000);
+  // Even invite-only, cap attempts per IP: the invite check is a database read, and the
+  // error it returns is a probe for which addresses are on the list.
+  const limit = await rateLimit(`signup:${clientIp(request)}`, 5, 60 * 60 * 1000);
   if (!limit.allowed) {
     return NextResponse.json(
       { error: "Too many accounts created from this network. Try again later." },
@@ -30,13 +32,42 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 
+  let decision;
+  try {
+    decision = await decideSignup(input.email);
+  } catch (error) {
+    console.error("Signup access check failed", error);
+    return NextResponse.json(
+      { error: "Sign-up is unavailable — this deployment is misconfigured. Open /api/health." },
+      { status: 503 },
+    );
+  }
+
+  if (!decision.allowed) {
+    return NextResponse.json({ error: decision.reason }, { status: 403 });
+  }
+
+  // Hashing is deliberately after the access check: bcrypt at cost 12 is expensive, and
+  // doing it for every uninvited attempt would make signup a way to burn the deployment's
+  // CPU. The timing difference reveals only whether an address is invited, which the reply
+  // already says.
   const passwordHash = await hash(input.password, BCRYPT_COST);
 
   let user;
   try {
-    user = await prisma.user.create({
-      data: { email: input.email, name: input.name, passwordHash },
-      select: { id: true, email: true, name: true },
+    user = await prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: { email: input.email, name: input.name, passwordHash, role: decision.role },
+        select: { id: true, email: true, name: true },
+      });
+      // Marks the invite used, or records the owner's own address so the access list is a
+      // complete picture of who can get in rather than only of later arrivals.
+      await tx.invite.upsert({
+        where: { email: input.email },
+        create: { email: input.email, acceptedAt: new Date() },
+        update: { acceptedAt: new Date() },
+      });
+      return created;
     });
   } catch (error) {
     // P2002 = unique constraint on email. Relying on the constraint rather than a
