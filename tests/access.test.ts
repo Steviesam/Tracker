@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { CLOSED, decideSignup, isOwner, MEMBER, OWNER } from "@/lib/access";
+import {
+  CLOSED,
+  decideSignup,
+  deploymentClaimed,
+  isOwner,
+  MEMBER,
+  OWNER,
+  roleOf,
+} from "@/lib/access";
 import { prisma } from "@/lib/db";
 import { databaseReachable } from "./helpers/database";
 
@@ -73,5 +81,29 @@ describe.runIf(await databaseReachable())("decideSignup", () => {
     await prisma.user.delete({ where: { id: user.id } });
 
     expect(await isOwner(user.id)).toBe(false);
+  });
+
+  it("reports an unclaimed deployment, so the sign-up page can say so", async () => {
+    expect(await deploymentClaimed()).toBe(false);
+    await makeUser("owner@example.com", OWNER);
+    expect(await deploymentClaimed()).toBe(true);
+  });
+
+  it("names every owner, not just the first, since a role can be granted later", async () => {
+    const first = await makeUser("first@example.com", OWNER);
+    const second = await makeUser("second@example.com", MEMBER);
+    expect(await roleOf(second.id)).toBe(MEMBER);
+
+    await prisma.user.update({ where: { id: second.id }, data: { role: OWNER } });
+
+    expect(await roleOf(first.id)).toBe(OWNER);
+    expect(await roleOf(second.id)).toBe(OWNER);
+  });
+
+  it("returns no role at all for an account that is gone", async () => {
+    const user = await makeUser("gone@example.com", MEMBER);
+    await prisma.user.delete({ where: { id: user.id } });
+
+    expect(await roleOf(user.id)).toBeNull();
   });
 });

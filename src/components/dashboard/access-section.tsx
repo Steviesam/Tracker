@@ -6,6 +6,8 @@ import { IconAlert, IconArrow, IconCheck, IconKey, IconRefresh, IconTrash } from
 type Invite = {
   id: string;
   email: string;
+  /** There can be more than one owner, so this is not just "is this me". */
+  isOwner: boolean;
   /** Set once they have signed up; until then the invite is unused. */
   acceptedAt: string | null;
   createdAt: string;
@@ -87,6 +89,25 @@ export default function AccessSection({ email, onError }: Props) {
     }
   }
 
+  async function setRole(target: string, role: "OWNER" | "MEMBER") {
+    setBusy(true);
+    try {
+      const response = await fetch("/api/access", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: target, role }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        onError(body.error ?? "Could not change that role.");
+        return;
+      }
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="card p-4">
@@ -149,8 +170,11 @@ export default function AccessSection({ email, onError }: Props) {
                 <li key={invite.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
                   <span className="min-w-0 flex-1 truncate text-sm">{invite.email}</span>
 
-                  {isYou ? (
-                    <span className="chip bg-indigo-50 text-indigo-700 ring-indigo-200">You · owner</span>
+                  {invite.isOwner ? (
+                    <span className="chip bg-indigo-50 text-indigo-700 ring-indigo-200">
+                      <IconKey className="h-3 w-3" />
+                      {isYou ? "You · owner" : "Owner"}
+                    </span>
                   ) : invite.acceptedAt ? (
                     <span className="chip bg-emerald-50 text-emerald-700 ring-emerald-200">
                       <IconCheck className="h-3 w-3" />
@@ -162,7 +186,30 @@ export default function AccessSection({ email, onError }: Props) {
                     </span>
                   )}
 
-                  {isYou ? null : (
+                  {/* Nobody may change their own role, so a deployment cannot be left
+                      with no owner and handing over control takes two people. */}
+                  {isYou ? null : invite.isOwner ? (
+                    <button
+                      className="btn-secondary"
+                      disabled={busy}
+                      title="Takes away their access to this list"
+                      onClick={() => void setRole(invite.email, "MEMBER")}
+                    >
+                      Make member
+                    </button>
+                  ) : invite.acceptedAt ? (
+                    <button
+                      className="btn-secondary"
+                      disabled={busy}
+                      title="Lets them invite and remove people too"
+                      onClick={() => void setRole(invite.email, "OWNER")}
+                    >
+                      <IconKey className="h-4 w-4" />
+                      Make owner
+                    </button>
+                  ) : null}
+
+                  {isYou || invite.isOwner ? null : (
                     <button
                       className="btn-secondary"
                       disabled={busy}
@@ -188,7 +235,9 @@ export default function AccessSection({ email, onError }: Props) {
         <IconAlert className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
         <p>
           Removing someone deletes their account and ends their session immediately. Their
-          uploaded directory stays — it belongs to the deployment, not to one person.
+          uploaded directory stays — it belongs to the deployment, not to one person. An
+          owner can invite and remove people, so make one only when you mean it; you cannot
+          change your own role, which is what stops a deployment losing its last owner.
         </p>
       </div>
     </div>

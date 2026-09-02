@@ -400,23 +400,49 @@ Anyone else who requests `/api/access` gets a 404, because to them it does not e
 - The owner cannot remove themselves, so a deployment can never end up with nobody in
   charge.
 
+### More than one owner
+
+**Make owner** in the Access list promotes someone who has already signed up; **Make
+member** takes it back. Every owner sees the Access section and can invite, remove and
+change roles, and they show up in the list marked **Owner**.
+
+Two rules hold the shape of this:
+
+- **Nobody can change their own role.** That makes it impossible for a deployment to lose
+  its last owner, without having to count who is left, and it means handing over control is
+  always a two-person act.
+- **One owner cannot remove another.** The account would survive the deletion while its
+  invite disappeared, leaving the list claiming someone is gone who can still sign in.
+  Demote them first, then remove.
+
+A role change takes effect on that person's next request — their role is read from the
+database every time, never from their session cookie, which was minted at login and would
+otherwise keep saying "owner" for the rest of its twelve hours.
+
 The list also shows accounts that existed before this was added, marked as already signed
 up, so it is a complete picture of who can get in rather than only of later arrivals.
 
-**On an existing deployment**, the migration makes the earliest account the owner. If that
-is not you, promote yourself directly:
+**On an existing deployment**, the migration makes the earliest account the owner — nobody
+has to be appointed by hand. If that is not you, that person can promote you from the
+Access list. Failing that, once:
 
 ```sql
 UPDATE "User" SET role = 'OWNER' WHERE email = 'you@example.com';
-UPDATE "User" SET role = 'MEMBER' WHERE email = 'someone.else@example.com';
 ```
 
 ### What this does not do
 
-Worth knowing before treating it as hardened: there is no two-factor authentication, no
-password reset, and no audit log of who looked at what. An invited person has the same
-access to the directory and the provider budget as the owner — the only thing reserved to
-the owner is the guest list.
+Worth knowing before treating it as hardened:
+
+- **Nothing is emailed.** Inviting someone records their address; you still have to tell
+  them yourself that they can now sign up.
+- **No password reset.** Someone who forgets theirs has to be removed and re-invited.
+- **No two-factor authentication**, and no audit log of who looked at what.
+- An invited person has the same access to the directory and to the provider budget as an
+  owner. The only things reserved to owners are the guest list and roles.
+
+The first three all want a way to send email. That is the next piece of work, and the
+choice is a provider (Resend or SES), an API key, and a verified sending domain.
 
 ## Architecture
 
