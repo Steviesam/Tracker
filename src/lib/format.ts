@@ -40,6 +40,56 @@ export function formatDay(iso: string | null): string {
   });
 }
 
+/** A deadline's time of day, in India: `11:00 am`. */
+export function formatTimeOfDay(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso)
+    .toLocaleTimeString("en-IN", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: "Asia/Kolkata",
+    })
+    .toLowerCase();
+}
+
+/**
+ * How long something took: `1h 15m`, `45m`, `2d 3h`.
+ *
+ * Rounded to whole minutes, and seconds are never shown. Nobody schedules to the second,
+ * and a duration reading "1h 15m 04s" invites a precision the timer does not have — it
+ * measures from when a button was pressed, not from when the work began.
+ */
+export function formatDuration(millis: number | null): string {
+  if (millis === null || millis === undefined) return "—";
+
+  // Checked before rounding: half a minute rounds up to one, and "1m" for thirty seconds
+  // claims a precision the timer does not have.
+  if (millis < 60_000) return "under a minute";
+
+  const minutes = Math.round(millis / 60_000);
+  if (minutes < 60) return `${minutes}m`;
+
+  const hours = Math.floor(minutes / 60);
+  const restMinutes = minutes % 60;
+  if (hours < 24) return restMinutes > 0 ? `${hours}h ${restMinutes}m` : `${hours}h`;
+
+  const days = Math.floor(hours / 24);
+  const restHours = hours % 24;
+  return restHours > 0 ? `${days}d ${restHours}h` : `${days}d`;
+}
+
+/**
+ * Time until a deadline, or how far past it: `in 40m`, `25m late`.
+ *
+ * The sign is carried by the words rather than a minus, because a row reading "-25m" beside
+ * a red badge is read as a negative quantity of work rather than as lateness.
+ */
+export function formatTimeLeft(millis: number | null): string {
+  if (millis === null || millis === undefined) return "";
+  return millis >= 0 ? `in ${formatDuration(millis)}` : `${formatDuration(-millis)} late`;
+}
+
 /** Whole rupees, grouped the Indian way: 12,50,000 rather than 1,250,000. */
 export function formatRupees(value: number | null): string {
   if (value === null || value === undefined) return "—";

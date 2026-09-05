@@ -1,7 +1,7 @@
 // SECURITY REVIEW REQUIRED — AI-generated change to security-critical code
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { isOwner, MEMBER, OWNER } from "@/lib/access";
+import { isOwner, isRole, MANAGER, MEMBER, OWNER } from "@/lib/access";
 import { emailSchema, firstIssue } from "@/lib/credentials";
 import { prisma } from "@/lib/db";
 import { requireSession } from "@/lib/session";
@@ -36,19 +36,21 @@ export async function GET() {
     select: { id: true, email: true, acceptedAt: true, createdAt: true },
   });
 
-  // Roles live on User, not Invite, and there can be more than one owner. Sending them
-  // means the list can say who else is in charge, rather than only marking the reader.
-  const owners = new Set(
-    (await prisma.user.findMany({ where: { role: OWNER }, select: { email: true } })).map(
-      (user) => user.email,
-    ),
+  // Roles live on User, not Invite. Sending each account's role means the list can say what
+  // everyone can do, rather than only marking who else is in charge.
+  const accounts = new Map(
+    (await prisma.user.findMany({ select: { email: true, role: true } })).map((user) => [
+      user.email,
+      isRole(user.role) ? user.role : MEMBER,
+    ]),
   );
 
   return NextResponse.json({
     invites: invites.map((invite) => ({
       id: invite.id,
       email: invite.email,
-      isOwner: owners.has(invite.email),
+      role: accounts.get(invite.email) ?? null,
+      isOwner: accounts.get(invite.email) === OWNER,
       acceptedAt: invite.acceptedAt?.toISOString() ?? null,
       createdAt: invite.createdAt.toISOString(),
     })),
@@ -81,7 +83,7 @@ export async function POST(request: Request) {
 }
 
 /**
- * Promote a member to owner, or demote one back.
+ * Move an account between the three roles.
  *
  * An owner can hand out access to everything, so the only guard that matters is that a
  * deployment cannot end up with nobody in charge: nobody may change their own role. That
@@ -95,7 +97,7 @@ export async function PATCH(request: Request) {
   let input;
   try {
     input = z
-      .object({ email: emailSchema, role: z.enum([OWNER, MEMBER]) })
+      .object({ email: emailSchema, role: z.enum([OWNER, MANAGER, MEMBER]) })
       .parse(await request.json());
   } catch (error) {
     const message = error instanceof z.ZodError ? firstIssue(error) : "Check the details sent.";

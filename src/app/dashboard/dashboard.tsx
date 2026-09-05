@@ -7,10 +7,13 @@ import CampaignsSection from "@/components/dashboard/campaigns-section";
 import CreatorsSection from "@/components/dashboard/creators-section";
 import DiscoverySection from "@/components/dashboard/discovery-section";
 import LinksSection, { type BusyKind } from "@/components/dashboard/links-section";
+import TasksSection from "@/components/dashboard/tasks-section";
+import { useDay } from "@/components/tasks/use-day";
 import {
   IconAlert,
   IconBriefcase,
   IconChart,
+  IconChecklist,
   IconCompass,
   IconKey,
   IconLogout,
@@ -113,6 +116,7 @@ const SECTION_ICON: Record<SectionId, (p: { className?: string }) => React.React
   links: IconChart,
   engagement: IconSpark,
   discovery: IconCompass,
+  tasks: IconChecklist,
   access: IconKey,
 };
 
@@ -145,6 +149,11 @@ export default function Dashboard({
     [],
   );
   const clearNotice = useCallback(() => setNotice(null), []);
+
+  // The day is read here rather than inside the Tasks section, so a deadline warning still
+  // arrives for somebody who has been on Discovery all afternoon, and so the count on the
+  // Tasks tab is right before anybody opens it.
+  const dayState = useDay(notify);
 
   // Detection and results live server-side for the session, so a reload restores them.
   useEffect(() => {
@@ -254,6 +263,7 @@ export default function Dashboard({
   const badgeFor = (id: SectionId) => {
     if (id === "links") return results.length || null;
     if (id === "engagement") return creatorCards.length || null;
+    if (id === "tasks") return dayState.outstanding || null;
     return null;
   };
 
@@ -440,6 +450,16 @@ export default function Dashboard({
             />
           ) : section === "discovery" ? (
             <DiscoverySection onError={setError} />
+          ) : section === "tasks" ? (
+            <TasksSection
+              meId={meId}
+              state={dayState}
+              onNotify={notify}
+              onOpenCampaign={(campaignId) => {
+                selectSection("campaigns");
+                openCampaign(campaignId);
+              }}
+            />
           ) : isOwner ? (
             <AccessSection email={email} onError={setError} />
           ) : null}

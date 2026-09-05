@@ -26,12 +26,22 @@
  * say how much.
  */
 
+import type { Role } from "@/lib/access";
 import { isMoneyActivity } from "@/lib/campaigns/activity";
 
 export type Viewer = {
   id: string;
+  role: Role;
   /** True only for the OWNER role. Read from the database on every request, never a cookie. */
   canSeeMoney: boolean;
+  /**
+   * Owner or manager: may assign work to anyone and read the whole team's day.
+   *
+   * Kept apart from `canSeeMoney` because they are different questions with different
+   * answers. A manager needs to know that Rahul has eight tasks and one is late; that is
+   * not a reason to show them what Rahul's creators are being paid.
+   */
+  canRunTheFloor: boolean;
 };
 
 /** The task kind that only an owner may see. */

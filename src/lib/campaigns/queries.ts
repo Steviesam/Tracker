@@ -263,6 +263,9 @@ export async function myWork(viewer: Viewer): Promise<MyWork> {
     where: {
       assignedToId: viewer.id,
       completedAt: null,
+      // Campaign work only. The Tasks section covers the whole day; this panel is on the
+      // campaigns screen, and repeating the same list there would make both worth ignoring.
+      campaignId: { not: null },
       // A payment task assigned to a member is not shown to them, so it is not fetched.
       ...(viewer.canSeeMoney ? {} : { kind: { not: PAYMENT_TASK } }),
     },
@@ -276,6 +279,9 @@ export async function myWork(viewer: Viewer): Promise<MyWork> {
   const overdue: MyWork["overdue"] = [];
 
   for (const task of tasks) {
+    // The query already excludes tasks without a campaign; this narrows the type to match,
+    // rather than asserting it, so a later change to the filter cannot produce a null here.
+    if (!task.campaign) continue;
     const view = { ...toTaskView(task, now), campaign: task.campaign };
     if (isPastDue(task.dueDate, now)) overdue.push(view);
     else if (isDueToday(task.dueDate, now)) dueToday.push(view);

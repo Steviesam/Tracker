@@ -229,31 +229,15 @@ export async function recordPayment(
   });
 }
 
-export async function completeTask(taskId: string, actorId: string, actorName: string) {
-  const task = await prisma.task.findUnique({
-    where: { id: taskId },
-    select: { id: true, campaignId: true, name: true, kind: true, completedAt: true },
-  });
-  if (!task) throw new Error("That task no longer exists.");
-  if (task.completedAt) return;
-
-  await prisma.$transaction(async (tx) => {
-    await tx.task.update({ where: { id: taskId }, data: { completedAt: new Date() } });
-    await record(
-      tx,
-      task.campaignId,
-      actorId,
-      // Ticking off a payment is still a line about money, and belongs behind the same door
-      // as the amount itself.
-      task.kind === PAYMENT_TASK ? "payment_task_completed" : "task_completed",
-      `${actorName} completed ${task.name}`,
-    );
-  });
-}
-
-export async function reopenTask(taskId: string) {
-  await prisma.task.updateMany({ where: { id: taskId }, data: { completedAt: null } });
-}
+/**
+ * Completing and reopening live in `lib/tasks` and are re-exported here.
+ *
+ * There is one implementation because a task ticked off on the Tasks screen and the same
+ * task ticked off inside its campaign have to do the same thing — stop the clock and write
+ * the campaign's history. Two implementations would drift, and the first symptom would be a
+ * campaign whose activity is missing the day somebody finished the work from the other tab.
+ */
+export { completeTask, reopenTask } from "@/lib/tasks/mutations";
 
 /**
  * Takes a fresh follower count and engagement rate for creators on a campaign.

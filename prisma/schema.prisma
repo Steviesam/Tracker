@@ -20,8 +20,9 @@ model User {
   name         String
   /// bcrypt hash. The plaintext password is never stored or logged.
   passwordHash String
-  /// `OWNER` or `MEMBER`. The first account to sign up owns the deployment; only an owner
-  /// can invite, which is what keeps signup closed without a password in an env var.
+  /// `OWNER`, `MANAGER` or `MEMBER`. The first account to sign up owns the deployment; only
+  /// an owner can invite, which is what keeps signup closed without a password in an env
+  /// var. A manager runs the floor — assigns work and sees everyone's — but not the money.
   role         String   @default("MEMBER")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -32,7 +33,9 @@ model User {
   campaignsManaged Campaign[]           @relation("CampaignManager")
   influencersOwned CampaignInfluencer[] @relation("InfluencerAssignee")
   tasksAssigned    Task[]               @relation("TaskAssignee")
+  tasksCreated     Task[]               @relation("TaskCreator")
   activities       Activity[]           @relation("ActivityActor")
+  workDays         WorkDay[]
 
   @@index([email])
 }
@@ -189,6 +192,7 @@ model Campaign {
 
   influencers CampaignInfluencer[]
   tasks       Task[]
+
   activities  Activity[]
 
   createdAt DateTime @default(now())
@@ -270,15 +274,21 @@ model CampaignInfluencer {
 /**
  * A piece of work with a name, an owner and a date.
  *
- * There is no stored status. "Overdue" is a fact about today and a due date, and a stored
- * copy of it would be wrong every morning until something rewrote it. `completedAt` is the
- * only state, and the rest is worked out when asked.
+ * There is no stored status. "Overdue" is a fact about the clock and a due date, and a
+ * stored copy of it would be wrong every morning until something rewrote it. `startedAt`
+ * and `completedAt` are the only state, and the rest is worked out when asked.
+ *
+ * One table holds both a campaign's tasks and the day's ordinary work. Two would mean an
+ * employee has two lists and neither answers "what am I doing today", and it would put the
+ * same job in two places to update — which is the thing this module exists to stop.
  */
 model Task {
   id String @id @default(cuid())
 
-  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  campaignId String
+  /// Null for work that belongs to no campaign — an invoice, a report, a call. Campaign
+  /// tasks keep the link, which is what lets finishing one move the campaign along.
+  campaign   Campaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId String?
 
   /// Set when the task exists because of one creator's stage, so it can be shown on
   /// their row. Null for a task somebody typed themselves.
@@ -286,6 +296,17 @@ model Task {
   influencerId String?
 
   name String
+
+  /// What the work is, for whoever picks it up hours after it was assigned.
+  description String?
+
+  /// The client this is for, when there is no campaign to name one. A campaign task takes
+  /// its brand from the campaign instead, so there is one place to correct a typo.
+  brand String?
+
+  /// `HIGH`, `MEDIUM` or `LOW`. The first sort key on every list of tasks, because the
+  /// question an employee opens the app with is not "what is next" but "what is first".
+  priority String @default("MEDIUM")
 
   /// GENERAL, or PAYMENT for the task that releasing money creates. Money is owner-only,
   /// so the reader has to be able to tell which tasks are about it — and matching on the
@@ -295,8 +316,47 @@ model Task {
   assignedTo   User?   @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   assignedToId String?
 
-  dueDate     DateTime?
+  /// Who assigned it. Null for the tasks the campaign automation raises by itself, which
+  /// is how "nobody asked for this, the system did" stays readable.
+  createdBy   User?   @relation("TaskCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdById String?
+
+  dueDate DateTime?
+
+  /**
+   * Whether `dueDate` carries a time of day or is only a date.
+   *
+   * A campaign task is due "on Thursday" and is late on Friday. A floor task is due "at
+   * 11:00" and is late at 11:01. Both are timestamps in the same column, so without this
+   * flag the second kind is indistinguishable from a date that happens to be midnight —
+   * and every all-day task would go red at 00:01.
+   */
+  dueHasTime Boolean @default(false)
+
+  /**
+   * Minutes before the deadline to warn the assignee. Null means no warning.
+   *
+   * Per task rather than one global setting: "tell me 15 minutes before" is right for a
+   * call and useless for a day's shortlisting, and the person assigning is the one who
+   * knows which it is.
+   */
+  reminderMinutes Int?
+
+  /// When the warning was shown, so it is shown once rather than on every poll.
+  remindedAt DateTime?
+
+  /// When work actually began. This is the timer: it starts here and stops at completedAt.
+  startedAt   DateTime?
   completedAt DateTime?
+
+  /**
+   * Why it ran long, was late, or is stuck — in the assignee's own words.
+   *
+   * The point is to find the process that keeps breaking, not to make anyone account for
+   * their time. "The data was missing so I checked it by hand" is a fact about the
+   * database, and it is only ever learnt by leaving somewhere to write it down.
+   */
+  note String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -305,6 +365,42 @@ model Task {
   @@index([assignedToId, completedAt])
   @@index([dueDate])
   @@index([kind])
+  /// The floor view: everything unfinished, worst first.
+  @@index([completedAt, priority, dueDate])
+}
+
+/**
+ * One person, one day, when they were here.
+ *
+ * Written from signing in and out rather than a clock-in button, because a button is one
+ * more thing to forget and its absence would read as absence from work.
+ *
+ * Deliberately thin. Sign-in, last seen, sign-out — enough to answer "has the team
+ * started" and no more. Anything finer would be surveillance, would be resented, and would
+ * not tell anyone which process is slow, which is the question this module is for.
+ */
+model WorkDay {
+  id String @id @default(cuid())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  /// The Indian calendar date, `YYYY-MM-DD`. A date rather than a timestamp because a
+  /// working day is a day, and the team is in one country.
+  day String
+
+  /// First sign-in of that day. Later sign-ins do not move it — arriving at nine and
+  /// signing in again after lunch is one working day that started at nine.
+  signedInAt DateTime
+
+  /// Touched as they use the app, so a day left open by a closed laptop still has an end.
+  lastSeenAt DateTime
+
+  /// Set by signing out. Null for a day that was never closed.
+  signedOutAt DateTime?
+
+  @@unique([userId, day])
+  @@index([day])
 }
 
 /**

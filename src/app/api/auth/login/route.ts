@@ -4,6 +4,7 @@ import { createSessionToken, SESSION_COOKIE, sessionCookieOptions } from "@/lib/
 import { loginSchema } from "@/lib/credentials";
 import { prisma } from "@/lib/db";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
+import { markPresent } from "@/lib/tasks/attendance";
 
 export const runtime = "nodejs";
 
@@ -43,7 +44,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
     }
 
-    await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+    const now = new Date();
+    await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: now } });
+    // The working day starts when somebody signs in, so there is no clock-in button to
+    // forget. The first sign-in of the day sets the arrival time; later ones do not move it.
+    await markPresent(user.id, now);
 
     const response = NextResponse.json({ ok: true });
     response.cookies.set(

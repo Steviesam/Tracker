@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "import:creators": "vite-node -c vitest.config.ts scripts/import-creators.ts",
+    "seed:day": "vite-node -c vitest.config.ts scripts/seed-day.ts",
     "db:up": "docker compose up -d",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",

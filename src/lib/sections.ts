@@ -3,7 +3,7 @@
  * case in the dashboard's section switch — nothing else in the shell needs to change.
  */
 
-export type SectionId = "campaigns" | "links" | "engagement" | "discovery" | "access";
+export type SectionId = "campaigns" | "links" | "engagement" | "discovery" | "tasks" | "access";
 
 export type Section = {
   id: SectionId;
@@ -35,9 +35,14 @@ export const SECTIONS: Section[] = [
     description: "Find Instagram creators in your directory by location, niche and audience size.",
   },
   {
+    id: "tasks",
+    label: "Tasks",
+    description: "Today's work — what is first, what is late, and how long it took.",
+  },
+  {
     id: "access",
     label: "Access",
-    description: "Who can sign up. Anyone not on this list is turned away.",
+    description: "Who can sign up, and what each of them can see.",
     /** Hidden from everyone but the owner; the API refuses it regardless of the nav. */
     ownerOnly: true,
   },

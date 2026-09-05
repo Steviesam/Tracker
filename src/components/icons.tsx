@@ -245,3 +245,29 @@ export const IconTrash = (p: IconProps) => (
     <path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
   </Svg>
 );
+
+export const IconChecklist = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3.5 6.5l1.5 1.5 3-3M3.5 13l1.5 1.5 3-3M3.5 19.5L5 21l3-3" />
+    <path d="M12 6h9M12 12.5h9M12 19h9" />
+  </Svg>
+);
+
+export const IconPlay = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M7 5.5l11 6.5-11 6.5z" />
+  </Svg>
+);
+
+export const IconFlag = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M5 21V4M5 4h11l-1.5 3.5L16 11H5" />
+  </Svg>
+);
+
+export const IconNote = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9L14.5 20h-9A1.5 1.5 0 0 1 4 18.5z" />
+    <path d="M20 14.5h-4a1.5 1.5 0 0 0-1.5 1.5v4M8 9h8M8 13h4" />
+  </Svg>
+);

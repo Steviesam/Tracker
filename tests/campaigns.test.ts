@@ -324,8 +324,13 @@ describe("stages", () => {
 });
 
 describe("who may see the money", () => {
-  const owner: Viewer = { id: "owner", canSeeMoney: true };
-  const member: Viewer = { id: "member", canSeeMoney: false };
+  const owner: Viewer = { id: "owner", role: "OWNER", canSeeMoney: true, canRunTheFloor: true };
+  const member: Viewer = {
+    id: "member",
+    role: "MEMBER",
+    canSeeMoney: false,
+    canRunTheFloor: false,
+  };
 
   const tasks = [
     { kind: "GENERAL", name: "Send brief" },

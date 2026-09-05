@@ -2,10 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { IconAlert, IconArrow, IconCheck, IconKey, IconRefresh, IconTrash } from "@/components/icons";
+import { ROLE_BLURB, ROLE_LABEL, ROLES, type Role } from "@/lib/access";
 
 type Invite = {
   id: string;
   email: string;
+  /** Null until they have signed up: an unused invite is an address, not an account. */
+  role: Role | null;
   /** There can be more than one owner, so this is not just "is this me". */
   isOwner: boolean;
   /** Set once they have signed up; until then the invite is unused. */
@@ -89,7 +92,7 @@ export default function AccessSection({ email, onError }: Props) {
     }
   }
 
-  async function setRole(target: string, role: "OWNER" | "MEMBER") {
+  async function setRole(target: string, role: Role) {
     setBusy(true);
     try {
       const response = await fetch("/api/access", {
@@ -174,12 +177,7 @@ export default function AccessSection({ email, onError }: Props) {
                 <li key={invite.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
                   <span className="min-w-0 flex-1 truncate text-sm">{invite.email}</span>
 
-                  {invite.isOwner ? (
-                    <span className="chip bg-indigo-50 text-indigo-700 ring-indigo-200">
-                      <IconKey className="h-3 w-3" />
-                      {isYou ? "You · owner" : "Owner"}
-                    </span>
-                  ) : invite.acceptedAt ? (
+                  {invite.acceptedAt ? (
                     <span className="chip bg-emerald-50 text-emerald-700 ring-emerald-200">
                       <IconCheck className="h-3 w-3" />
                       Signed up {when(invite.acceptedAt)}
@@ -190,28 +188,35 @@ export default function AccessSection({ email, onError }: Props) {
                     </span>
                   )}
 
-                  {/* Nobody may change their own role, so a deployment cannot be left
-                      with no owner and handing over control takes two people. */}
-                  {isYou ? null : invite.isOwner ? (
-                    <button
-                      className="btn-secondary"
+                  {/*
+                    A dropdown rather than a pair of buttons, now that there are three
+                    roles: two buttons could only say "make the other one", which stops
+                    reading as an answer the moment there is a third option.
+
+                    Nobody may change their own role, so a deployment cannot be left with no
+                    owner and handing over control always takes two people.
+                  */}
+                  {invite.role === null ? null : isYou ? (
+                    <span className="chip bg-indigo-50 text-indigo-700 ring-indigo-200">
+                      <IconKey className="h-3 w-3" />
+                      You · {ROLE_LABEL[invite.role].toLowerCase()}
+                    </span>
+                  ) : (
+                    <select
+                      className="field-sm w-auto"
+                      value={invite.role}
                       disabled={busy}
-                      title="Takes away their access to this list"
-                      onClick={() => void setRole(invite.email, "MEMBER")}
+                      title={ROLE_BLURB[invite.role]}
+                      aria-label={`Role for ${invite.email}`}
+                      onChange={(event) => void setRole(invite.email, event.target.value as Role)}
                     >
-                      Make member
-                    </button>
-                  ) : invite.acceptedAt ? (
-                    <button
-                      className="btn-secondary"
-                      disabled={busy}
-                      title="Lets them invite and remove people too"
-                      onClick={() => void setRole(invite.email, "OWNER")}
-                    >
-                      <IconKey className="h-4 w-4" />
-                      Make owner
-                    </button>
-                  ) : null}
+                      {ROLES.map((role) => (
+                        <option key={role} value={role}>
+                          {ROLE_LABEL[role]}
+                        </option>
+                      ))}
+                    </select>
+                  )}
 
                   {isYou || invite.isOwner ? null : (
                     <button
@@ -237,12 +242,21 @@ export default function AccessSection({ email, onError }: Props) {
 
       <div className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
         <IconAlert className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-        <p>
-          Removing someone deletes their account and ends their session immediately. Their
-          uploaded directory stays — it belongs to the deployment, not to one person. An
-          owner can invite and remove people, so make one only when you mean it; you cannot
-          change your own role, which is what stops a deployment losing its last owner.
-        </p>
+        <div className="space-y-2">
+          <p>
+            Removing someone deletes their account and ends their session immediately. Their
+            uploaded directory stays — it belongs to the deployment, not to one person. You
+            cannot change your own role, which is what stops a deployment losing its last owner.
+          </p>
+          <ul className="space-y-0.5">
+            {ROLES.map((role) => (
+              <li key={role}>
+                <span className="font-medium text-slate-700">{ROLE_LABEL[role]}</span> —{" "}
+                {ROLE_BLURB[role]}
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </div>
   );

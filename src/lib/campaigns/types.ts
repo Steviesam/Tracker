@@ -88,7 +88,13 @@ export type CampaignDetail = {
   canSeeMoney: boolean;
 };
 
-/** The landing view: what is on me today, and which campaigns are running. */
+/**
+ * The campaign screen's landing view: what campaign work is on me today.
+ *
+ * Only campaign tasks. The Tasks section shows the whole day including work that belongs to
+ * no campaign; this panel sits on the campaigns screen and answers the narrower question,
+ * so that opening a campaign does not present the same list a second time.
+ */
 export type MyWork = {
   dueToday: (TaskView & { campaign: { id: string; name: string } })[];
   overdue: (TaskView & { campaign: { id: string; name: string } })[];

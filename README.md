@@ -7,15 +7,19 @@ No campaigns, no brands, no CRM, no historical tracking.
 
 ## What it does
 
-The dashboard has three sections, listed in the left sidebar:
+The dashboard has five sections, listed in the left sidebar:
 
+- **Campaigns** — a brand's work in one place: who is on it, what stage they are at, what
+  is due, and what has been paid.
 - **Metrics** — add links, fetch metrics, browse and export the table. Headline totals sit
   at the top of this section, each labelled with how many links it came from.
 - **Engagement** — recent-video averages and engagement rate, per account.
 - **Discovery** — search a directory of Instagram creators by state, city, niche and
   follower range.
+- **Tasks** — the day's work: what is first, what is late, how long it took, and for a
+  manager, what the whole team is doing.
 
-Adding a fourth is a matter of adding an entry to `src/lib/sections.ts` and a component;
+Adding a sixth is a matter of adding an entry to `src/lib/sections.ts` and a component;
 the shell needs no other change.
 
 1. **Sign up / log in** — email + password, session cookie.
@@ -558,6 +562,127 @@ of a failure teaches people to dismiss the banner without reading it, and then t
 go unread too — so a confirmation is green and clears itself, while an error stays until it is
 dismissed.
 
+## Tasks
+
+The day's work, for the person doing it and for the person allocating it. The aim is that
+an employee never has to be asked what they are up to and a manager never has to ask.
+
+### One list, not two
+
+Campaign tasks and the day's ordinary work are the same table and the same list. Two lists
+would mean an employee has to look in both to know what their day is, and would put the
+same job in two places to update — which is the thing this module exists to stop. So
+`Task.campaignId` is nullable: a task can belong to a campaign, or to nothing but a client
+name.
+
+The consequence is the automatic update the brief asked for. Ticking off a campaign task on
+the Tasks screen *is* the campaign being updated — the same write stops the clock and adds
+the line to the campaign's activity. There is no second step that could fail or be skipped.
+
+### What an employee sees
+
+One screen, in the order somebody actually reads it: **Overdue**, then **Today**, then
+**Completed today**, then **Coming up** (the next week).
+
+Within each, tasks sort by **priority, then deadline**. That order is the point. A low
+priority task due in an hour should not push a high priority one off the top of somebody's
+morning, and "what is first" is the question people open the app with — not "what is
+soonest".
+
+Undated work sorts last within its priority. It is the work that can wait, by definition.
+
+### Status, and why none of it is stored
+
+Pending, In progress, Completed, Overdue — all four worked out on read, from two stored
+timestamps (`startedAt`, `completedAt`) and the deadline. A stored "overdue" flag would be
+wrong from the moment a deadline passed until something rewrote it, and on a serverless host
+nothing is sitting there to rewrite it.
+
+**Overdue outranks in progress.** Somebody who starts a task an hour after it was due is
+still late, and a list that quietly reclassified it the moment they opened it would hide
+exactly the row a manager is looking for.
+
+### Two kinds of deadline
+
+Some work is due *on Thursday*; some is due *at 11:00*. Both are timestamps in one column,
+so a `dueHasTime` flag says which — without it every all-day task would go red at one
+minute past midnight, which would be the single most annoying bug this feature could have.
+
+An all-day task counts down to the end of its day and is late the next morning. A timed one
+is late at 11:01.
+
+### The timer
+
+**Start** stamps `startedAt`, **Complete** stamps `completedAt`, and the time taken is the
+gap: *Started 10:05 am, Completed 11:20 am, 1h 15m*.
+
+- Pressing Start twice does nothing the second time. The button is easy to hit twice and the
+  second press should not erase the first hour.
+- Completing something that was never started stamps the start as now, so it reads as having
+  taken no time rather than as having no timing. Back-dating it to when it was assigned would
+  report a five-minute job as having taken two days.
+- Reopening clears both. A reopened task is being done again, and the old duration described
+  the first attempt.
+
+### Reminders
+
+Set per task when it is assigned — 15 minutes to a day before, or none. Per task rather than
+one global setting, because "tell me 15 minutes before" is right for a call and useless for
+a day's shortlisting, and the person assigning is the one who knows which it is.
+
+The warning appears as the app's own notice, amber, and waits to be dismissed. It is polled
+for at the dashboard level rather than inside the Tasks screen, so it still reaches somebody
+who has been reading Discovery all afternoon. Each warning is shown once: `remindedAt` on
+the row stops it returning after a reload, and one nag is a reminder where twenty is a
+reason to stop reading them.
+
+Browser notifications were deliberately not used — they need a permission prompt, most
+people refuse it, and they arrive when the tab is closed, which is when nobody can act.
+
+### Reason and blocker
+
+Every task has a free-text note, offered whether or not it is late. A task that is going to
+overrun is known to be going to overrun long before the deadline proves it, and the moment
+somebody knows is the moment they should be able to say so.
+
+*"Influencer data was missing from the database, had to verify by hand."* That is a fact
+about the database. It is only ever learnt by leaving somewhere to write it down.
+
+### What a manager sees
+
+A **Team** tab, on the same rows the employees are ticking off. Nobody reports anything to
+anybody; the counts *are* the tasks.
+
+- Team totals: tasks today, completed, in progress, pending, overdue.
+- **Who is doing what** — a line per person: *Rahul Verma · 8 tasks · 6 done · 1 pending ·
+  1 overdue*, with when they signed in.
+- **Overdue across the team**, worst first, with the reason if one has been given.
+- **Where the time went** — completed and average time per person, and the jobs that keep
+  running late.
+
+That last table is grouped on the task name, because the same job is raised under the same
+name every time. A name that keeps appearing there is a process that does not fit the time
+it is given. It is deliberately a table and not a score: a score invites ranking people,
+which is not what anyone learns from, and the useful finding is almost never "Rahul is slow"
+and almost always "this job takes three hours and we keep giving it one".
+
+### Attendance, and where it stops
+
+A sign-in time, a last-seen time, and a sign-out time. That is the whole record.
+
+Written from signing in rather than from a clock-in button, because a button is one more
+thing to forget and forgetting it would read as not having come to work. The first sign-in
+of the day sets the arrival time — signing in again after lunch does not restart the day.
+Signing back in after signing out clears the sign-out, so somebody who came back is not left
+sitting under a line saying they had left.
+
+Most days end with a closed laptop rather than a sign-out, so the duration runs to whichever
+came last. A day left open does not keep growing all night.
+
+There is no idle timer, no screenshot, no keystroke count, and there should not be. None of
+them would say which process is slow, which is the only question this module was built to
+answer.
+
 ## Accounts and security
 
 Users live in Postgres (`User` table). Passwords are bcrypt hashes at cost 12; plaintext is
@@ -587,11 +712,20 @@ Anyone else who requests `/api/access` gets a 404, because to them it does not e
 - The owner cannot remove themselves, so a deployment can never end up with nobody in
   charge.
 
-### More than one owner
+### The three roles
 
-**Make owner** in the Access list promotes someone who has already signed up; **Make
-member** takes it back. Every owner sees the Access section and can invite, remove and
-change roles, and they show up in the list marked **Owner**.
+Every account that has signed up has a role, changed from the dropdown beside it in the
+Access list:
+
+| Role | What it can do |
+| --- | --- |
+| **Owner** | Everything, including every figure. Sees the Access list, invites, removes, and changes roles. |
+| **Operations manager** | Assigns work to anybody, sees the whole team's day, their attendance and the productivity figures. Cannot see money. |
+| **Team member** | Their own tasks, and the campaigns they are on. |
+
+Manager is separate from owner because the two jobs separate in a real agency. The person
+allocating tomorrow's shortlisting is rarely the person who knows the margins, and folding
+them together would have meant handing out the rates in order to hand out the rota.
 
 Two rules hold the shape of this:
 
@@ -626,7 +760,9 @@ Worth knowing before treating it as hardened:
 - **No password reset.** Someone who forgets theirs has to be removed and re-invited.
 - **No two-factor authentication**, and no audit log of who looked at what.
 - An invited person has the same access to the directory and to the provider budget as an
-  owner. The only things reserved to owners are the guest list and roles.
+  owner. The things reserved to owners are the guest list, the roles, and every figure.
+- **Attendance is not a timesheet.** It records a first sign-in, a last-seen and a
+  sign-out, and nothing finer. See the Tasks section below for why it stops there.
 
 The first three all want a way to send email. That is the next piece of work, and the
 choice is a provider (Resend or SES), an API key, and a verified sending domain.
@@ -635,15 +771,18 @@ choice is a provider (Resend or SES), an API key, and a verified sending domain.
 
 ```
 prisma/schema.prisma       User + Invite + RateLimit + Creator + WorkSession
-                           + Campaign + CampaignInfluencer + Task + Activity
+                           + Campaign + CampaignInfluencer + Task + Activity + WorkDay
 src/
   app/
     signup/ login/         Auth pages
-    dashboard/             Campaigns | Metrics | Engagement | Discovery | Access (owner)
+    dashboard/             Campaigns | Metrics | Engagement | Discovery | Tasks
+                           | Access (owner)
     api/
-      auth/…               Signup, login, logout
+      auth/…               Signup, login, logout (login/logout also mark attendance)
       access               The owner's invite list
       campaigns/…          List, workspace, influencers, tasks, stat refresh
+      tasks/…              One person's day; assign, start, complete, note
+      team                 The manager's team view and productivity figures
       my-work              What is due today for the signed-in person
       upload               Scan a workbook, detect links
       urls                 Direct pasted-URL input
@@ -657,6 +796,7 @@ src/
   components/
     dashboard/             One component per sidebar section
     campaigns/             Workspace, influencer rows, tasks, shared badges
+    tasks/                 A task row, the assign form, the team view
   lib/
     detect.ts              URL extraction, platform ID, canonicalisation, dedupe
     parse.ts               Excel + CSV reading across all sheets
@@ -667,6 +807,9 @@ src/
     campaigns/             Stages, Indian days, progress, automation, history
       visibility.ts        What a member may not see, and why
       viewer.ts            Route guard: who is asking, and may they see money
+    tasks/                 Derived state, the timer, reminders, attendance
+      model.ts             Pending/in progress/overdue, worked out on read
+      attendance.ts        Sign-in, last seen, sign-out
     access.ts              Who may sign up, and who is the owner
     store.ts               Per-login Metrics/Engagement work (Postgres)
     export.ts              CSV + XLSX writers
@@ -697,6 +840,7 @@ the sheet every session. Refresh, logout and a server restart all leave it in pl
 | --- | --- | --- | --- |
 | Accounts | yes | yes | yes |
 | Creator directory (the sheet) | yes | yes | yes |
+| Campaigns, tasks, attendance | yes | yes | yes |
 | Metrics / Engagement work | yes | no | yes |
 | Open sidebar section | yes (URL) | no | n/a |
 
@@ -828,7 +972,13 @@ npm run db:migrate   # create/apply migrations (dev)
 npm run db:studio    # browse the database
 
 npm run import:creators -- sheet.xlsx   # load a sheet without the browser
+npm run seed:day     # four accounts and a day of work, to look at the screens
 ```
+
+`seed:day` writes an owner, a manager and two members — all with the password it prints —
+plus a campaign and a day of tasks that includes a running timer, something overdue with a
+reason on it, and a name long enough to test the layout. It refuses to run against anything
+but a database on your own machine, since it creates people who do not exist.
 
 ### A separate database for the tests
 

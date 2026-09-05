@@ -9,7 +9,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { OWNER, roleOf } from "@/lib/access";
+import { canRunTheFloor, OWNER, roleOf } from "@/lib/access";
 import type { Viewer } from "@/lib/campaigns/visibility";
 import { requireSession } from "@/lib/session";
 import type { SessionPayload } from "@/lib/auth";
@@ -28,7 +28,12 @@ export async function requireViewer(): Promise<
 
   return {
     session: auth.session,
-    viewer: { id: auth.session.uid, canSeeMoney: role === OWNER },
+    viewer: {
+      id: auth.session.uid,
+      role,
+      canSeeMoney: role === OWNER,
+      canRunTheFloor: canRunTheFloor(role),
+    },
   };
 }
 
@@ -37,4 +42,11 @@ export const MONEY_DENIED = "Only an owner can see or change what a campaign pay
 
 export function denyMoney(): NextResponse {
   return NextResponse.json({ error: MONEY_DENIED }, { status: 403 });
+}
+
+/** The refusal for work that belongs to someone else. */
+export const FLOOR_DENIED = "Only an owner or an operations manager can do that.";
+
+export function denyFloor(): NextResponse {
+  return NextResponse.json({ error: FLOOR_DENIED }, { status: 403 });
 }

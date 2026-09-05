@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import { IconAlert, IconCheck, IconClose } from "@/components/icons";
+import { IconAlert, IconCheck, IconClock, IconClose } from "@/components/icons";
 
-export type NoticeTone = "error" | "success";
+export type NoticeTone = "error" | "success" | "info";
 
 export type Notice = { message: string; tone: NoticeTone };
 
@@ -15,6 +15,10 @@ export type Notice = { message: string; tone: NoticeTone };
  * clears itself and never wears the red that means "something needs you". Dressing "Added 2
  * influencers" as an alarm teaches people to dismiss the banner without reading it, and then
  * the real errors go unread too.
+ *
+ * A deadline warning is a third thing: it needs acting on, so it waits to be dismissed like
+ * an error, but nothing has gone wrong yet, so it is amber rather than red. A reminder that
+ * faded out while somebody was away from the desk would not have reminded anybody.
  */
 export default function Toast({
   notice,
@@ -43,22 +47,34 @@ export default function Toast({
   if (!notice) return null;
 
   const good = notice.tone === "success";
+  const warn = notice.tone === "info";
+
+  const border = good
+    ? "border-emerald-200/80"
+    : warn
+      ? "border-amber-200/80"
+      : "border-rose-200/80";
+  const badge = good
+    ? "bg-emerald-50 text-emerald-600"
+    : warn
+      ? "bg-amber-50 text-amber-600"
+      : "bg-rose-50 text-rose-600";
 
   return (
     <div
       role={good ? "status" : "alert"}
       // Above the phone's tab bar, and across the full width there: a card floating in the
       // corner of a 390px screen is either cramped or covering the thing it is about.
-      className={`animate-rise fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-50 flex items-start gap-3 rounded-xl border bg-white p-3.5 pr-3 shadow-xl sm:inset-x-auto sm:bottom-5 sm:right-5 sm:max-w-sm ${
-        good ? "border-emerald-200/80" : "border-rose-200/80"
-      }`}
+      className={`animate-rise fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-50 flex items-start gap-3 rounded-xl border bg-white p-3.5 pr-3 shadow-xl sm:inset-x-auto sm:bottom-5 sm:right-5 sm:max-w-sm ${border}`}
     >
-      <span
-        className={`mt-px grid h-6 w-6 shrink-0 place-items-center rounded-full ${
-          good ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
-        }`}
-      >
-        {good ? <IconCheck className="h-3.5 w-3.5" /> : <IconAlert className="h-3.5 w-3.5" />}
+      <span className={`mt-px grid h-6 w-6 shrink-0 place-items-center rounded-full ${badge}`}>
+        {good ? (
+          <IconCheck className="h-3.5 w-3.5" />
+        ) : warn ? (
+          <IconClock className="h-3.5 w-3.5" />
+        ) : (
+          <IconAlert className="h-3.5 w-3.5" />
+        )}
       </span>
       <p className="flex-1 pt-0.5 text-[13px] leading-snug text-slate-700">{notice.message}</p>
       <button

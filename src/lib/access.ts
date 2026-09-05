@@ -14,10 +14,46 @@
 
 import { prisma } from "@/lib/db";
 
+/**
+ * Three roles, and the line between them is what each is trusted with.
+ *
+ * OWNER runs the business and is the only one who sees money. MANAGER runs the floor:
+ * assigns work, sees what everyone is doing and how long it took, but not what anyone is
+ * being paid. MEMBER does the work and sees their own.
+ *
+ * Manager is separate from owner because the two jobs separate in a real agency — the
+ * person allocating tomorrow's shortlisting is rarely the person who knows the margins —
+ * and folding them together would have meant handing out the rates to get the rota.
+ */
 export const OWNER = "OWNER";
+export const MANAGER = "MANAGER";
 export const MEMBER = "MEMBER";
 
-export type Role = typeof OWNER | typeof MEMBER;
+export type Role = typeof OWNER | typeof MANAGER | typeof MEMBER;
+
+export const ROLES: Role[] = [OWNER, MANAGER, MEMBER];
+
+export const ROLE_LABEL: Record<Role, string> = {
+  OWNER: "Owner",
+  MANAGER: "Operations manager",
+  MEMBER: "Team member",
+};
+
+/** What each role is for, in the one sentence the access screen has room for. */
+export const ROLE_BLURB: Record<Role, string> = {
+  OWNER: "Everything, including every figure.",
+  MANAGER: "Assigns work and sees the whole team. No money.",
+  MEMBER: "Their own tasks and the campaigns they are on.",
+};
+
+export function isRole(value: unknown): value is Role {
+  return ROLES.includes(value as Role);
+}
+
+/** Can hand out work and read everyone's day. Owners manage too. */
+export function canRunTheFloor(role: Role): boolean {
+  return role === OWNER || role === MANAGER;
+}
 
 export const CLOSED =
   "This deployment is invite-only. Ask its owner to add your email address, then sign up.";
@@ -67,5 +103,7 @@ export async function isOwner(userId: string): Promise<boolean> {
 export async function roleOf(userId: string): Promise<Role | null> {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
   if (!user) return null;
-  return user.role === OWNER ? OWNER : MEMBER;
+  // An unrecognised string in the column falls to the least privilege rather than throwing:
+  // a typo in the database should cost someone a screen, never hand them the rates.
+  return isRole(user.role) ? user.role : MEMBER;
 }
