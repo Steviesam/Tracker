@@ -20,9 +20,10 @@ export default async function DashboardPage({
 
   // The cookie outlives the account it names, so a revoked person would otherwise keep
   // seeing the dashboard shell until it expired — empty, since every request behind it
-  // fails, but still there.
+  // fails, but still there. Sent to be thrown away rather than straight to /login, which
+  // the middleware would bounce back here on the strength of the cookie still verifying.
   const role = await roleOf(session.uid);
-  if (!role) redirect("/login");
+  if (!role) redirect("/api/auth/ended");
 
   return (
     <Dashboard
